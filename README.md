@@ -24,4 +24,8 @@ node server.js
 
 Then open `http://127.0.0.1:5185/`.
 
+## Product Spec
+
+The launchpad design brief is in `docs/topaz-token-launchpad-design.md`.
+
 No wallet transaction, contract call, or backend request is made. This is only a visual and interaction prototype.
