@@ -15,6 +15,8 @@ Other possible names:
 
 Arbor Foundry should not copy a generic presale launchpad. The strongest version is an independent, liquidity-first launchpad that integrates with Topaz V2:
 
+Implementation companion: see `docs/arbor-foundry-mvp-technical-spec.md` for the MVP contract, backend, frontend, testing, and deployment plan.
+
 > Projects launch a token, create a Topaz trading pair, lock launch liquidity publicly, and fund early incentives for veTOPAZ voters.
 
 The core promise:

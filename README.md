@@ -6,6 +6,8 @@ Brand promise: Liquidity rooted on Topaz.
 
 Open `index.html` directly in a browser, or serve this folder with any small static server.
 
+Technical build spec: `docs/arbor-foundry-mvp-technical-spec.md`
+
 The prototype shows:
 
 - Launch list tabs for approved, live, upcoming, finalized, and refunding launches.
