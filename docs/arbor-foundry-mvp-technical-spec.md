@@ -476,9 +476,9 @@ Before BNB mainnet:
 
 ### Phase 1: Spec and Contract Scaffold
 
-- Finalize this technical spec.
-- Choose Solidity toolchain.
-- Create contracts package.
+- Finalize this technical spec. Status: started.
+- Choose Solidity toolchain. Status: Foundry-style layout selected.
+- Create contracts package. Status: initial `contracts/` scaffold added.
 - Add tests for sale vault and accounting.
 
 ### Phase 2: Backend/Admin
@@ -534,5 +534,6 @@ The current frontend prototype already represents:
 - 80/20 LP fee split disclosure.
 - Verify This Launch trust page.
 - Admin/private accounting concept.
+- Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
 
-The next engineering step is to scaffold the contracts and backend data model around this spec.
+The next engineering step is to add contract tests and confirm the Topaz V2 ABIs before any testnet deployment.
