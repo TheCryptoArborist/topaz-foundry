@@ -2,18 +2,18 @@
 
 ## Working name
 
-Topaz Foundry
+Arbor Foundry
 
 Other possible names:
 
-- Topaz Launch
-- Topaz Forge
-- GemPad by Topaz
-- Topaz Genesis
+- Root Foundry
+- Grove Foundry
+- Canopy Foundry
+- Seed Foundry
 
 ## Product thesis
 
-Topaz should not copy a generic presale launchpad. The strongest Topaz-native version is a liquidity-first launchpad:
+Arbor Foundry should not copy a generic presale launchpad. The strongest version is an independent, liquidity-first launchpad that integrates with Topaz V2:
 
 > Projects launch a token, create a Topaz trading pair, lock launch liquidity publicly, and fund early incentives for veTOPAZ voters.
 
@@ -66,9 +66,9 @@ They need a reason to care about launches:
 - More fee-generating pools.
 - A public dashboard showing which new launches are actually bringing volume.
 
-### Topaz protocol
+### Topaz ecosystem
 
-Topaz gets:
+Topaz gets ecosystem activity without owning or operating the launchpad:
 
 - More pairs.
 - More locked liquidity.
@@ -131,6 +131,7 @@ Every project should commit to these before a launch is listed:
 
 Suggested default:
 
+- First-version raises should be realistic for small ecosystem teams: roughly $25,000 to $150,000 as a common range, with larger goals treated as exceptions that need stronger review.
 - 50% to 70% of raised funds go into LP.
 - LP is locked for at least 12 months, with permanent fee-split locking as the premium trust option.
 - Team allocation vests over 6 to 24 months.
@@ -154,7 +155,7 @@ The UI should make these buckets unavoidable. Buyers should not need to read a w
 
 The launchpad should create this loop:
 
-1. Project launches through Topaz Foundry.
+1. Project launches through Arbor Foundry.
 2. Sale closes successfully.
 3. Topaz pair is created automatically.
 4. Initial LP is locked.
@@ -168,26 +169,29 @@ This is the main reason to build the product as a Topaz launchpad instead of a g
 
 ## Platform economics
 
-The launchpad can earn fees without making the product feel extractive.
+The MVP fee model is intentionally simple:
 
-Possible fee model:
+- 2% success fee on completed raises.
+- 0% platform success fee when soft cap is missed.
+- No flat listing fee in the MVP.
+- 20% of claimable LP fees when the Arbor Foundry fee-split locker is used.
+- Platform treasury routing should be configured internally at the contract/backend layer, not displayed as a public payout wallet.
+- A small BNB application or deploy fee can be configurable later, but the frontend prototype should not hardcode a required fee until backend and contract support exists.
 
-- 1% to 3% of funds raised.
-- Optional flat listing fee.
-- Optional fee on collected LP fees if using the fee-split LP locker.
+LP fee split:
 
-Recommended fee routing:
-
-| Fee destination | Purpose |
-| --- | --- |
-| Topaz treasury | Operations, audits, support |
-| TOPAZ buy/lock program | Creates recurring demand for TOPAZ |
-| Launch incentives | Helps fund early gauge or voter rewards |
-| Referral or partner share | Optional growth channel |
+| Fee recipient | Share |
+| --- | ---: |
+| Project creator | 80% |
+| Arbor Foundry | 20% |
 
 The cleanest public message:
 
-> Launch fees help fund Topaz liquidity, voter incentives, and protocol growth.
+> Arbor Foundry earns a 2% success fee only when a launch completes, plus 20% of claimable LP fees when projects choose the fee-split locker.
+
+Short public version:
+
+> No success, no fee. If soft cap is missed, buyers refund and Arbor Foundry takes 0%.
 
 ## Smart contract modules
 
@@ -338,6 +342,7 @@ Responsibilities:
 Project submits:
 
 - Token name and symbol.
+- Project token logo.
 - Token contract or request to deploy one.
 - Supply allocation.
 - Raise target.
@@ -345,6 +350,7 @@ Project submits:
 - Liquidity percentage.
 - Team vesting schedule.
 - Incentive budget.
+- Optional social share settings, including campaign hashtag and creator channels.
 - Project links and disclosures.
 
 ### 2. Review
@@ -398,18 +404,26 @@ The UI should show:
 If soft cap is met:
 
 - Sale closes.
-- Liquidity funds are separated.
+- The actual final raise becomes the accounting base, even if the hard cap was not reached.
+- 2% Arbor Foundry success fee is accounted from the actual final raise and routed through internal platform treasury configuration.
+- Liquidity funds are calculated from the remaining successful raise according to the creator-set LP commitment.
+- The UI should show total raised, platform success fee, net raise after fee, liquidity commitment percentage, amount sent to Topaz liquidity, and remaining creator/project proceeds.
 - Topaz pool is created or seeded.
 - LP is locked.
 - Vesting vault is funded.
 - Launch incentives are funded or queued.
 - Buyer claim opens.
 - Trading opens.
+- Direct Topaz trade link and pool/LP proof are published, even if the Topaz frontend indexer needs time to surface the new pair automatically.
 
 If soft cap is not met:
 
 - Project cannot withdraw funds.
 - Buyers can refund.
+- Arbor Foundry platform success fee is `0`.
+- No Topaz pool is created.
+- No LP token is minted or locked.
+- Buyer token claims do not open.
 - Launch page moves to failed/refunded status.
 
 ### 6. Post-launch dashboard
@@ -436,6 +450,7 @@ This is where Topaz can separate itself from launchpads that disappear after the
 
 Tabs:
 
+- Approved
 - Live
 - Upcoming
 - Finalized
@@ -450,11 +465,16 @@ Cards should show:
 - Vesting badge.
 - Incentives funded badge.
 - Review status.
+- Soft-cap status.
+- Refund/finalization outcome.
 
 ### Launch detail
 
 Main sections:
 
+- Plain-language launch summary.
+- Buyer trust checklist.
+- Launch outcome math for fee, net raise, liquidity, and creator proceeds.
 - Buy panel.
 - Raise progress.
 - Sale terms.
@@ -463,10 +483,15 @@ Main sections:
 - LP lock proof.
 - Vesting schedule.
 - Incentive schedule.
+- Optional creator share kit.
 - Contract links.
 - Risk disclosures.
 
-The buy panel should be compact and direct. The proof sections should be easy to inspect before buying.
+The buy panel should be compact and direct. It should change by launch state: contribute for live raises, watch for upcoming raises, claim for finalized raises, and refund for failed raises. The proof sections should be easy to inspect before buying and must not imply that LP is locked before a successful close.
+
+Buyers should immediately understand whether the project is approved, whether it is live, whether soft cap has been met, what happens if the raise fails, where refunds happen, when claims open, where proof is published, and where to trade after finalization.
+
+Mobile and tablet layouts should be treated as first-class. Navigation, launch rows, buyer action panels, proof strips, tables, social share cards, and the create-launch drawer should collapse without horizontal page overflow. On small screens, tables may stack or scroll inside their own container, but core actions must remain thumb-friendly.
 
 ### Create launch wizard
 
@@ -477,25 +502,48 @@ Steps:
 3. Liquidity
 4. Vesting
 5. Incentives
-6. Review
+6. Links
+7. Social
+8. Review
 
-The wizard should block launch creation if required proof fields are missing.
+The wizard should create a draft or pending-review launch, not a live launch. It should block approval if required proof fields are missing.
 
-### Proof page
+Creator inputs should be constrained where the platform must enforce known options. Sale type, accepted asset, contract mode, quote asset, lock duration, refund behavior, audit/review status, and social-share cadence should use dropdown choices rather than free text. Soft cap, hard cap, wallet max, and liquidity commitment should use number inputs. Platform economics, LP fee split, pool defaults, and proof routes should be read-only in the creator form. Private treasury routing should stay out of the public creator UI.
 
-Each launched token gets a permanent proof page:
+Each wizard step should show short domain guidance so creators understand the consequence of the fields they are setting, especially soft cap, hard cap, liquidity commitment, vesting, incentives, and optional social sharing.
 
-- Sale contract.
-- Token contract.
-- Topaz pair.
-- LP lock contract.
-- LP token / pool address.
-- Lock start.
-- Lock duration or permanent status.
-- Fee beneficiary.
-- Fees collected.
-- Vesting vaults.
-- Incentive deposits.
+The review gate is an anti-spam and quality control layer. It should reduce low-quality launches by checking token behavior, disclosures, project links, social links, liquidity commitment, vesting terms, and refund safety before anything can go live.
+
+The Social step is optional. A creator can enable or disable generated progress posts without changing sale terms, token terms, liquidity routing, refunds, or proof requirements. If enabled, Arbor Foundry should generate copy-ready updates for soft-cap pushes, soft-cap-met milestones, hard-cap progress, finalization, proof publication, and refund notices.
+
+### Verify This Launch
+
+Each launched token gets a permanent verification page. The user-facing purpose is to check the sale result, liquidity status, LP lock, vesting, claims/refunds, and Topaz pair before trusting or acting on the launch.
+
+State-aware verification should show:
+
+- Launch status.
+- Soft cap and hard cap.
+- Final raised amount or current progress.
+- Arbor Foundry platform success fee.
+- Net raise after fee.
+- Liquidity amount added to Topaz.
+- Topaz pair address or pending state.
+- LP lock status.
+- Buyer claim status.
+- Refund status.
+- Vesting status if applicable.
+- Incentive deposits if applicable.
+- Trade on Topaz link when available.
+
+State behavior:
+
+- Draft or pending review: not public or not approved yet.
+- Approved: reviewed, but deposits are not open.
+- Upcoming: approved and scheduled, but not live.
+- Live: raise in progress.
+- Finalized: liquidity, LP lock, claims, and trade proof are visible.
+- Refunding: refund proof is visible, with no liquidity proof because no Topaz pair was created.
 
 This page is the trust asset.
 
@@ -539,8 +587,11 @@ The first useful version should be narrow:
 - Basic vesting vault.
 - Buyer refund and claim flow.
 - Public launch detail page.
-- Public LP proof page.
+- Optional creator share kit for progress updates.
+- Public launch verification page.
 - Admin panel for review and launch status.
+- Private platform accounting for total raised, expected 2% success fees, actual collected fees, failed launches at $0 fee, liquidity committed, LP fee split status, approval queue, finalization tasks, and refund enablement tasks.
+- Configurable private platform treasury settings, kept out of normal public UI.
 
 Do not start with:
 
@@ -574,6 +625,7 @@ These need answers before contracts are written:
 - Should LP locking be permanent by default or time-locked by default?
 - Should launch incentives be required for every launch?
 - What is the platform fee, and how much should route back into TOPAZ or veTOPAZ?
+- Should Arbor Foundry charge a small configurable BNB application/deploy fee once contract support exists?
 - What review standard is required before a launch appears publicly?
 - What legal/compliance policy applies to launch participation?
 
@@ -583,11 +635,11 @@ These need answers before contracts are written:
 2. Decide MVP sale type and accepted raise asset.
 3. Write a concrete launch configuration schema.
 4. Draft contracts around the schema.
-5. Build the launch detail UI and proof page first.
+5. Build the launch detail UI and launch verification page first.
 6. Add create-launch/admin tooling.
 7. Test refund, finalization, LP locking, vesting, and claims.
 8. Run a private test launch before opening public submissions.
 
 ## Short public positioning
 
-Topaz Foundry is a liquidity-first launchpad for projects launching on TopazDEX. Its promise is simple: liquidity rooted on Topaz. Every launch is built around public sale terms, locked Topaz V2 liquidity, transparent vesting, and early Topaz incentives, so buyers can inspect the launch and veTOPAZ voters can see which new pools are worth supporting.
+Arbor Foundry is an independently operated, liquidity-first launchpad for projects that want to root their launch liquidity on Topaz V2. Its promise is simple: liquidity rooted on Topaz. Every launch is built around public sale terms, locked Topaz V2 liquidity, transparent vesting, and early Topaz incentives, so buyers can inspect the launch and veTOPAZ voters can see which new pools are worth supporting.

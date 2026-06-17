@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Arbor Foundry logo</title>
+  <desc id="desc">A stylized tree with roots over a foundry base.</desc>
+  <defs>
+    <linearGradient id="canopy" x1="25" x2="103" y1="18" y2="82" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#83e36e"/>
+      <stop offset=".48" stop-color="#36e6b6"/>
+      <stop offset="1" stop-color="#62d8ff"/>
+    </linearGradient>
+    <linearGradient id="trunk" x1="52" x2="78" y1="51" y2="105" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f2c84b"/>
+      <stop offset="1" stop-color="#14a882"/>
+    </linearGradient>
+    <radialGradient id="core" cx="64" cy="52" r="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#173126"/>
+      <stop offset="1" stop-color="#081013"/>
+    </radialGradient>
+  </defs>
+  <path fill="url(#core)" stroke="#36e6b6" stroke-opacity=".58" stroke-width="3" d="M64 6 109 32v52l-45 38-45-38V32L64 6Z"/>
+  <path fill="none" stroke="#f2c84b" stroke-opacity=".32" stroke-width="2" d="m28 82 36 30 36-30"/>
+  <path fill="url(#canopy)" d="M64 18c9 10 16 19 16 29 0 8-6 14-16 16-10-2-16-8-16-16 0-10 7-19 16-29Z"/>
+  <path fill="url(#canopy)" d="M37 33c13 2 25 7 31 16 5 8 2 17-7 23-12 0-23-5-29-14-5-8-3-17 5-25Z"/>
+  <path fill="url(#canopy)" d="M91 33c8 8 10 17 5 25-6 9-17 14-29 14-9-6-12-15-7-23 6-9 18-14 31-16Z"/>
+  <path fill="#eafff8" fill-opacity=".24" d="M64 25c4 6 7 12 7 18 0 5-3 9-7 11-4-2-7-6-7-11 0-6 3-12 7-18Z"/>
+  <path fill="url(#trunk)" d="M58 59h12l-2 26 13 14H47l13-14-2-26Z"/>
+  <path fill="none" stroke="#36e6b6" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M64 72v18m0 0-17 14m17-14 17 14m-17-9-9 11m9-11 9 11"/>
+  <path fill="#0c171a" stroke="#f2c84b" stroke-linejoin="round" stroke-width="3" d="M40 96h48l-8 14H48l-8-14Z"/>
+  <path fill="#36e6b6" d="M33 78h10v4H33zm52 0h10v4H85z"/>
+  <path fill="#f2c84b" d="M64 10 69 22h-10l5-12Z"/>
+</svg>

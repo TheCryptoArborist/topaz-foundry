@@ -9,6 +9,8 @@ const types = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".md": "text/markdown; charset=utf-8",
 };
 
@@ -40,5 +42,5 @@ const server = http.createServer((request, response) => {
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`Topaz Foundry prototype: http://127.0.0.1:${port}/`);
+  console.log(`Arbor Foundry prototype: http://127.0.0.1:${port}/`);
 });
