@@ -80,7 +80,7 @@ Topaz gets ecosystem activity without owning or operating the launchpad:
 
 ### 1. Fair launch
 
-Best default mode.
+Best default mode and the first self-serve MVP sale type.
 
 Participants deposit the accepted raise asset during a fixed window. When the sale closes, token allocation is pro rata.
 
@@ -94,7 +94,7 @@ Useful rules:
 
 ### 2. Fixed-price sale
 
-Simple mode.
+Simple mode. It can be available from the beginning with guided review/setup, but should not be treated as fully automated/self-serve until the fair-launch path is tested.
 
 The project sets token price, raise cap, wallet cap, start time, and end time. Buyers contribute until the cap is reached.
 
@@ -107,7 +107,7 @@ Useful rules:
 
 ### 3. Liquidity bootstrap launch
 
-More Topaz-native, but better as a later version.
+More Topaz-native. It can be available from the beginning with guided review/setup, but should stay review-heavy until pricing, liquidity, and finalization behavior are tested.
 
 The launch is built around seeding the trading pair rather than only selling tokens. A high percentage of the raise is paired with project tokens and locked as LP.
 
@@ -506,9 +506,9 @@ Steps:
 7. Social
 8. Review
 
-The wizard should create a draft or pending-review launch, not a live launch. It should block approval if required proof fields are missing.
+The wizard should create a draft or pending-review launch, not a live launch. It should block approval if required proof fields are missing. In the MVP, Fair Launch is the self-serve automated path. Fixed-price sale and liquidity bootstrap can be offered from the beginning with guided review/setup, but should not bypass review or be treated as fully automated until contracts and backend support exist.
 
-Creator inputs should be constrained where the platform must enforce known options. Sale type, accepted asset, contract mode, quote asset, lock duration, refund behavior, audit/review status, and social-share cadence should use dropdown choices rather than free text. Soft cap, hard cap, wallet max, and liquidity commitment should use number inputs. Platform economics, LP fee split, pool defaults, and proof routes should be read-only in the creator form. Private treasury routing should stay out of the public creator UI.
+Creator inputs should be constrained where the platform must enforce known options. Sale type, accepted asset, contract mode, quote asset, lock duration, refund behavior, audit/review status, and social-share cadence should use dropdown choices rather than free text. In the MVP, the sale-type dropdown can show all three modes, but should label Fair Launch as self-serve and the other two as guided setup modes. Soft cap, hard cap, wallet max, and liquidity commitment should use number inputs. Platform economics, LP fee split, pool defaults, and proof routes should be read-only in the creator form. Private treasury routing should stay out of the public creator UI.
 
 Each wizard step should show short domain guidance so creators understand the consequence of the fields they are setting, especially soft cap, hard cap, liquidity commitment, vesting, incentives, and optional social sharing.
 
@@ -579,7 +579,8 @@ The UI should show flags plainly and avoid overpromising safety.
 
 The first useful version should be narrow:
 
-- One sale type: fair launch or fixed-price sale.
+- One self-serve sale type: fair launch.
+- Guided setup intake for fixed-price sale and liquidity bootstrap, with review required before any live launch.
 - One or two accepted raise assets.
 - Manual project approval.
 - Mandatory Topaz liquidity creation.
@@ -596,6 +597,8 @@ The first useful version should be narrow:
 Do not start with:
 
 - Permissionless launch creation.
+- Permissionless fixed-price sale contracts before the fair-launch path is tested.
+- Permissionless liquidity bootstrap contracts before the fair-launch path is tested.
 - Complex bonding curves.
 - Multi-chain support.
 - Custom token taxes.
@@ -614,7 +617,8 @@ After MVP:
 - Referral tracking.
 - Audit partner marketplace.
 - Post-launch milestone unlocks.
-- Liquidity bootstrap launches.
+- Self-serve fixed-price sales.
+- Self-serve liquidity bootstrap launches.
 
 ## Open implementation questions
 
@@ -632,7 +636,7 @@ These need answers before contracts are written:
 ## Recommended build path
 
 1. Confirm the Topaz V2 router/factory ABI against the live BNB Chain deployment.
-2. Decide MVP sale type and accepted raise asset.
+2. Lock Fair Launch as the self-serve MVP sale type, keep the other modes available through guided setup, and decide accepted raise asset.
 3. Write a concrete launch configuration schema.
 4. Draft contracts around the schema.
 5. Build the launch detail UI and launch verification page first.

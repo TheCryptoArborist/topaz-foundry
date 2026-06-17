@@ -547,7 +547,7 @@ const wizardSteps = ["Token", "Sale", "Liquidity", "Vesting", "Incentives", "Lin
 
 const wizardGuidance = {
   Token: ["This is the public identity buyers will inspect first.", "Use a project logo, not the Arbor Foundry platform logo."],
-  Sale: ["Soft cap is the minimum needed to launch.", "Hard cap is the most the project can accept."],
+  Sale: ["All three sale modes can be requested from the start.", "Fair launch is self-serve in MVP; fixed-price and liquidity bootstrap are available with guided review and setup."],
   Liquidity: ["Choose how much of the successful raise becomes Topaz liquidity.", "LP proof is published after a successful close."],
   Vesting: ["Make team unlocks readable before anyone contributes.", "Short or unclear vesting should be reviewed carefully."],
   Incentives: ["Incentives are optional support for post-launch attention.", "Keep budgets realistic for smaller launches."],
@@ -2645,7 +2645,12 @@ function renderWizardField([label, value, type = "text", options = []]) {
         <label>${label}</label>
         <select aria-label="${label}">
           ${options
-            .map((option) => `<option value="${option}" ${option === value ? "selected" : ""}>${option}</option>`)
+            .map((option) => {
+              const optionValue = typeof option === "string" ? option : option.value;
+              const optionLabel = typeof option === "string" ? option : option.label;
+              const disabled = typeof option === "string" || !option.disabled ? "" : " disabled";
+              return `<option value="${optionValue}" ${optionValue === value ? "selected" : ""}${disabled}>${optionLabel}</option>`;
+            })
             .join("")}
         </select>
       </div>
@@ -2693,6 +2698,7 @@ function renderWizardContent() {
         ${[
           ["Token", "Fixed supply, no transfer tax"],
           ["Token logo", "Project image uploaded"],
+          ["Sale type", "Fair launch self-serve; other modes available with guided setup"],
           ["Sale goals", "Creator sets soft cap, hard cap, and wallet limits"],
           ["Liquidity goal", "Creator commits raise percentage and minimum locked LP"],
           ["LP Lock", "ERC20 LP token minted directly to locker"],
@@ -2719,11 +2725,22 @@ function renderWizardContent() {
       ["Project summary", "A short launch description buyers can inspect.", "textarea"],
     ],
     Sale: [
-      ["Sale type", "Fair launch", "select", ["Fair launch", "Fixed-price sale", "Liquidity bootstrap"]],
+      [
+        "Sale type",
+        "Fair launch",
+        "select",
+        [
+          { value: "Fair launch", label: "Fair launch (self-serve MVP)" },
+          { value: "Fixed-price sale", label: "Fixed-price sale (guided setup)" },
+          { value: "Liquidity bootstrap", label: "Liquidity bootstrap (guided setup)" },
+        ],
+      ],
       ["Accepted asset", "USDT", "select", ["USDT", "WBNB"]],
       ["Soft cap chosen by creator", "25000", "number"],
       ["Hard cap chosen by creator", "100000", "number"],
       ["Wallet max chosen by creator", "2500", "number"],
+      ["Standard setup", "Fair launch self-serve", "readonly"],
+      ["Guided setup", "Fixed-price and liquidity bootstrap", "readonly"],
       ["Suggested small-launch range", "$25,000 to $150,000", "readonly"],
       ["Platform success fee", platformEconomics.successFeeLabel, "readonly"],
       ["If soft cap misses", "Refunds open automatically", "select", ["Refunds open automatically", "Admin-reviewed refunds"]],
