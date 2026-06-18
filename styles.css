@@ -1632,7 +1632,7 @@ h3 {
 
 .file-picker-control {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: minmax(180px, max-content) minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -1653,11 +1653,26 @@ h3 {
 }
 
 .native-logo-input {
-  position: fixed;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  width: 100%;
+  max-width: 260px;
+  min-height: 40px;
+  color: var(--text-soft);
+  border: 1px solid rgba(54, 230, 182, 0.24);
+  background: rgba(2, 13, 14, 0.78);
+  cursor: pointer;
+  font: inherit;
+}
+
+.native-logo-input::file-selector-button {
+  min-height: 40px;
+  margin: 0 12px 0 0;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid rgba(54, 230, 182, 0.45);
+  background: rgba(54, 230, 182, 0.12);
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .file-picker-name {

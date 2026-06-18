@@ -490,6 +490,8 @@ const state = {
     tokenLogoName: "",
     tokenLogoDataUrl: "",
     tokenLogoError: "",
+    tokenLogoSignature: "",
+    tokenLogoPendingSignature: "",
     saleToken: "",
     totalSupply: "100000000",
     saleTokenAmount: "1000000",
@@ -808,6 +810,7 @@ function isEvmAddress(address) {
 }
 
 const tokenLogoStorageKey = "arbor-foundry-token-logos-v1";
+let activeTokenLogoReadId = 0;
 
 function canUseLocalStorage() {
   try {
@@ -3878,7 +3881,7 @@ function renderWizardField([label, value, type = "text", options = [], key = ""]
   }
 
   if (type === "file") {
-    const inputId = "token-logo-file-input";
+    const inputId = `token-logo-file-input-${state.view}-${state.wizardStep}-${normalizeAddress(state.testnetLaunchTx.launchAddress || "draft")}`;
     const preview = state.wizardForm.tokenLogoDataUrl
       ? `<img src="${escapeHtml(state.wizardForm.tokenLogoDataUrl)}" alt="" />`
       : `<span>${escapeHtml(state.wizardForm.symbol || fieldValue || "LOGO").slice(0, 4)}</span>`;
@@ -3891,11 +3894,10 @@ function renderWizardField([label, value, type = "text", options = [], key = ""]
           <div class="token-logo-preview ${state.wizardForm.tokenLogoDataUrl ? "has-image" : ""}" aria-hidden="true">${preview}</div>
           <div class="file-field-stack">
             <div class="file-picker-control">
-              <label class="file-picker-button" for="${inputId}">Choose File</label>
-              <input id="${inputId}" class="native-logo-input"${binding} type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <input id="${inputId}" class="native-logo-input"${binding} type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Choose token logo" onchange="window.__arborFoundryHandleLogoFile?.(this)" />
               <span class="file-picker-name ${filenameClass}">${escapeHtml(filename)}</span>
             </div>
-            <span class="micro">Pick the image, then press Open in the Windows file picker.</span>
+            <span class="micro">Pick the image, then press Open. The filename should appear here immediately.</span>
             ${state.wizardForm.tokenLogoError ? `<span class="form-error-line">${escapeHtml(state.wizardForm.tokenLogoError)}</span>` : ""}
           </div>
         </div>
@@ -4385,26 +4387,41 @@ async function handleClick(event) {
 }
 
 async function handleTokenLogoChange(input) {
+  const file = input?.files?.[0];
+  if (!file) {
+    state.wizardForm.tokenLogoName = "";
+    state.wizardForm.tokenLogoError = "No logo file was selected.";
+    renderApp();
+    return;
+  }
+
+  const signature = `${file.name}:${file.size}:${file.lastModified}`;
+  if (state.wizardForm.tokenLogoPendingSignature === signature) return;
+  state.wizardForm.tokenLogoPendingSignature = signature;
+  const readId = ++activeTokenLogoReadId;
+
   try {
-    const file = input.files?.[0];
-    if (file) {
-      state.wizardForm.tokenLogoName = file.name;
-      state.wizardForm.tokenLogoError = "Reading selected logo...";
-      renderApp();
-    }
+    state.wizardForm.tokenLogoName = file.name;
+    state.wizardForm.tokenLogoError = "Reading selected logo...";
+    renderApp();
 
     const dataUrl = await tokenLogoDataUrlFromFile(file);
+    if (readId !== activeTokenLogoReadId) return;
     state.wizardForm.tokenLogo = dataUrl;
     state.wizardForm.tokenLogoDataUrl = dataUrl;
     state.wizardForm.tokenLogoName = file.name;
+    state.wizardForm.tokenLogoSignature = signature;
+    state.wizardForm.tokenLogoPendingSignature = "";
     state.wizardForm.tokenLogoError = "";
     rememberWizardTokenLogo();
     renderApp();
     showToast("Token logo saved for this browser.");
   } catch (error) {
+    if (readId !== activeTokenLogoReadId) return;
     state.wizardForm.tokenLogo = "";
     state.wizardForm.tokenLogoDataUrl = "";
-    state.wizardForm.tokenLogoName = input.files?.[0]?.name || "";
+    state.wizardForm.tokenLogoName = file.name || "";
+    state.wizardForm.tokenLogoPendingSignature = "";
     state.wizardForm.tokenLogoError = error.message || "Logo upload was not completed.";
     renderApp();
     showToast(state.wizardForm.tokenLogoError);
@@ -4438,7 +4455,6 @@ async function handleInput(event) {
 function handleDocumentChange(event) {
   const target = event.target;
   if (target?.dataset?.wizardField === "tokenLogo" && target.type === "file") {
-    event.stopPropagation();
     handleTokenLogoChange(target);
   }
 }
@@ -4447,6 +4463,7 @@ app.addEventListener("click", handleClick);
 app.addEventListener("input", handleInput);
 app.addEventListener("change", handleInput);
 document.addEventListener("change", handleDocumentChange, true);
+window.__arborFoundryHandleLogoFile = handleTokenLogoChange;
 renderApp();
 refreshTestnetData(true);
 
