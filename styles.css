@@ -1630,6 +1630,54 @@ h3 {
   gap: 6px;
 }
 
+.file-picker-control {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-picker-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(54, 230, 182, 0.45);
+  background: rgba(54, 230, 182, 0.08);
+  color: var(--text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-picker-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-picker-name {
+  min-width: 0;
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-picker-name.selected {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.form-error-line {
+  color: var(--yellow);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .review-list {
   display: grid;
   gap: 10px;

@@ -489,6 +489,7 @@ const state = {
     tokenLogo: "",
     tokenLogoName: "",
     tokenLogoDataUrl: "",
+    tokenLogoError: "",
     saleToken: "",
     totalSupply: "100000000",
     saleTokenAmount: "1000000",
@@ -897,11 +898,17 @@ function resizeImageDataUrl(dataUrl, maxSize = 512) {
 
 async function tokenLogoDataUrlFromFile(file) {
   if (!file) throw new Error("Choose a logo file.");
-  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
-    throw new Error("Use a PNG, JPG, or WebP logo image.");
+  const extension = String(file.name || "").split(".").pop().toLowerCase();
+  const allowedByType = ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type);
+  const allowedByName = ["png", "jpg", "jpeg", "webp", "gif"].includes(extension);
+  if (!allowedByType && !allowedByName) {
+    throw new Error("Use a PNG, JPG, WebP, or GIF logo image.");
   }
   const dataUrl = await readFileAsDataUrl(file);
-  return file.size > 750000 ? resizeImageDataUrl(dataUrl) : dataUrl;
+  if (!/^data:image\/(png|jpeg|webp|gif);base64,/i.test(dataUrl)) {
+    throw new Error("That file did not load as a supported image.");
+  }
+  return file.size > 750000 && !/^data:image\/gif/i.test(dataUrl) ? resizeImageDataUrl(dataUrl) : dataUrl;
 }
 
 function numericChainId(chainId) {
@@ -3874,17 +3881,23 @@ function renderWizardField([label, value, type = "text", options = [], key = ""]
     const preview = state.wizardForm.tokenLogoDataUrl
       ? `<img src="${escapeHtml(state.wizardForm.tokenLogoDataUrl)}" alt="" />`
       : `<span>${escapeHtml(state.wizardForm.symbol || fieldValue || "LOGO").slice(0, 4)}</span>`;
-    const filename = state.wizardForm.tokenLogoName
-      ? `<span class="micro">Selected: ${escapeHtml(state.wizardForm.tokenLogoName)}</span>`
-      : '<span class="micro">PNG, JPG, or WebP. Stored locally for this prototype.</span>';
+    const filename = state.wizardForm.tokenLogoName || "No file selected yet";
+    const filenameClass = state.wizardForm.tokenLogoName ? "selected" : "";
     return `
       <div class="form-field full">
         <label>${label}</label>
         <div class="logo-upload-row">
           <div class="token-logo-preview ${state.wizardForm.tokenLogoDataUrl ? "has-image" : ""}" aria-hidden="true">${preview}</div>
           <div class="file-field-stack">
-            <input${binding} type="file" accept="image/png,image/jpeg,image/webp" />
-            ${filename}
+            <div class="file-picker-control">
+              <label class="file-picker-button">
+                Choose File
+                <input${binding} type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              </label>
+              <span class="file-picker-name ${filenameClass}">${escapeHtml(filename)}</span>
+            </div>
+            <span class="micro">PNG, JPG, WebP, or GIF. Stored locally for this prototype.</span>
+            ${state.wizardForm.tokenLogoError ? `<span class="form-error-line">${escapeHtml(state.wizardForm.tokenLogoError)}</span>` : ""}
           </div>
         </div>
       </div>
@@ -4381,21 +4394,24 @@ async function handleInput(event) {
   const wizardField = event.target.dataset.wizardField;
   if (wizardField) {
     if (wizardField === "tokenLogo" && event.target.type === "file") {
+      if (event.type !== "change") return;
       try {
         const file = event.target.files?.[0];
         const dataUrl = await tokenLogoDataUrlFromFile(file);
         state.wizardForm.tokenLogo = dataUrl;
         state.wizardForm.tokenLogoDataUrl = dataUrl;
         state.wizardForm.tokenLogoName = file.name;
+        state.wizardForm.tokenLogoError = "";
         rememberWizardTokenLogo();
         renderApp();
         showToast("Token logo saved for this browser.");
       } catch (error) {
         state.wizardForm.tokenLogo = "";
         state.wizardForm.tokenLogoDataUrl = "";
-        state.wizardForm.tokenLogoName = "";
+        state.wizardForm.tokenLogoName = event.target.files?.[0]?.name || "";
+        state.wizardForm.tokenLogoError = error.message || "Logo upload was not completed.";
         renderApp();
-        showToast(error.message || "Logo upload was not completed.");
+        showToast(state.wizardForm.tokenLogoError);
       }
       return;
     }
