@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {ArborOwnable} from "./lib/ArborOwnable.sol";
-import {ArborReentrancyGuard} from "./lib/ArborReentrancyGuard.sol";
-import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { ArborOwnable } from "./lib/ArborOwnable.sol";
+import { ArborReentrancyGuard } from "./lib/ArborReentrancyGuard.sol";
+import { SafeTransferLib } from "./lib/SafeTransferLib.sol";
 
 contract IncentiveEscrow is ArborOwnable, ArborReentrancyGuard {
     using SafeTransferLib for IERC20;
@@ -22,7 +22,9 @@ contract IncentiveEscrow is ArborOwnable, ArborReentrancyGuard {
     uint256 public nextIncentiveId = 1;
     mapping(uint256 => Incentive) public incentives;
 
-    event IncentiveCreated(uint256 indexed incentiveId, address indexed project, address indexed token, uint256 promisedAmount);
+    event IncentiveCreated(
+        uint256 indexed incentiveId, address indexed project, address indexed token, uint256 promisedAmount
+    );
     event IncentiveFunded(uint256 indexed incentiveId, uint256 amount);
     event IncentiveReleased(uint256 indexed incentiveId, address indexed distributor, uint256 amount);
 
@@ -32,7 +34,7 @@ contract IncentiveEscrow is ArborOwnable, ArborReentrancyGuard {
     error OverFunded();
     error NothingFunded();
 
-    constructor(address owner_) ArborOwnable(owner_) {}
+    constructor(address owner_) ArborOwnable(owner_) { }
 
     function createIncentive(IERC20 token, address project, address distributor, uint256 promisedAmount)
         external

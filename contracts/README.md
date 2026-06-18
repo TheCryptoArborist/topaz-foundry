@@ -25,6 +25,15 @@ Included support files:
 - `ArborFoundryTypes.sol` - shared enums and structs.
 - `interfaces/` - minimal ERC20 and Topaz V2 interfaces.
 - `lib/` - minimal ownership, re-entry guard, and ERC20 transfer helpers.
+- `test/ArborFoundryMvp.t.sol` - first Foundry test suite with local mock ERC20 and Topaz V2 contracts.
+
+First-pass tests cover:
+
+- Failed fair launch refund path with 0 platform fee.
+- Successful fair launch finalization with 2% platform fee, net raise, Topaz liquidity amount, creator proceeds, LP minting, and buyer token claim.
+- 80/20 non-gauged LP fee split.
+- Incentive escrow overfunding protection and release.
+- Basic vesting claim release.
 
 ## Important Notes
 
@@ -35,7 +44,7 @@ The base `SaleVault` is built around the self-serve Fair Launch path. Fixed-pric
 Before mainnet:
 
 1. Install Foundry.
-2. Add unit tests for all success/refund/accounting branches.
+2. Expand unit tests for caps, double-claim protection, double-refund protection, double-finalization protection, and guided setup restrictions.
 3. Confirm Topaz V2 ABIs against the live BNB Chain contracts.
 4. Run a BNB testnet or local fork dry run.
 5. Get external security review before handling user funds.

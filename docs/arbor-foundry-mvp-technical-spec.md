@@ -479,7 +479,7 @@ Before BNB mainnet:
 - Finalize this technical spec. Status: started.
 - Choose Solidity toolchain. Status: Foundry-style layout selected.
 - Create contracts package. Status: initial `contracts/` scaffold added.
-- Add tests for sale vault and accounting.
+- Add tests for sale vault and accounting. Status: first-pass Foundry tests added for refunds, successful finalization, 2% fee accounting, LP fee split, vesting, and incentive escrow.
 
 ### Phase 2: Backend/Admin
 
@@ -535,5 +535,6 @@ The current frontend prototype already represents:
 - Verify This Launch trust page.
 - Admin/private accounting concept.
 - Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
+- First Foundry test suite for refund, finalization accounting, LP fee split, vesting, and incentive escrow paths.
 
-The next engineering step is to add contract tests and confirm the Topaz V2 ABIs before any testnet deployment.
+The next engineering step is to expand negative-path contract tests and confirm the Topaz V2 ABIs before any testnet deployment.

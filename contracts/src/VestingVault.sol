@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {ArborOwnable} from "./lib/ArborOwnable.sol";
-import {ArborReentrancyGuard} from "./lib/ArborReentrancyGuard.sol";
-import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { ArborOwnable } from "./lib/ArborOwnable.sol";
+import { ArborReentrancyGuard } from "./lib/ArborReentrancyGuard.sol";
+import { SafeTransferLib } from "./lib/SafeTransferLib.sol";
 
 contract VestingVault is ArborOwnable, ArborReentrancyGuard {
     using SafeTransferLib for IERC20;
@@ -23,7 +23,9 @@ contract VestingVault is ArborOwnable, ArborReentrancyGuard {
     uint256 public nextScheduleId = 1;
     mapping(uint256 => Schedule) public schedules;
 
-    event ScheduleCreated(uint256 indexed scheduleId, address indexed beneficiary, address indexed token, uint256 amount);
+    event ScheduleCreated(
+        uint256 indexed scheduleId, address indexed beneficiary, address indexed token, uint256 amount
+    );
     event Claimed(uint256 indexed scheduleId, address indexed beneficiary, uint256 amount);
 
     error InvalidConfig();
@@ -31,7 +33,7 @@ contract VestingVault is ArborOwnable, ArborReentrancyGuard {
     error NothingToClaim();
     error NotBeneficiary();
 
-    constructor(address owner_) ArborOwnable(owner_) {}
+    constructor(address owner_) ArborOwnable(owner_) { }
 
     function createSchedule(
         IERC20 token,

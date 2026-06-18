@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ArborFoundryTypes} from "./ArborFoundryTypes.sol";
-import {SaleVault} from "./SaleVault.sol";
-import {ArborOwnable} from "./lib/ArborOwnable.sol";
+import { ArborFoundryTypes } from "./ArborFoundryTypes.sol";
+import { SaleVault } from "./SaleVault.sol";
+import { ArborOwnable } from "./lib/ArborOwnable.sol";
 
 contract LaunchFactory is ArborOwnable {
     uint16 public constant DEFAULT_PLATFORM_FEE_BPS = 200;

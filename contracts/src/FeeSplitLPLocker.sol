@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "./interfaces/IERC20.sol";
-import {ITopazV2Pair} from "./interfaces/ITopazV2Pair.sol";
-import {ArborOwnable} from "./lib/ArborOwnable.sol";
-import {ArborReentrancyGuard} from "./lib/ArborReentrancyGuard.sol";
-import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { ITopazV2Pair } from "./interfaces/ITopazV2Pair.sol";
+import { ArborOwnable } from "./lib/ArborOwnable.sol";
+import { ArborReentrancyGuard } from "./lib/ArborReentrancyGuard.sol";
+import { SafeTransferLib } from "./lib/SafeTransferLib.sol";
 
 contract FeeSplitLPLocker is ArborOwnable, ArborReentrancyGuard {
     using SafeTransferLib for IERC20;
@@ -31,13 +31,15 @@ contract FeeSplitLPLocker is ArborOwnable, ArborReentrancyGuard {
         uint256 unlockTime,
         bool permanent
     );
-    event FeesClaimed(address indexed pair, address indexed token0, address indexed token1, uint256 amount0, uint256 amount1);
+    event FeesClaimed(
+        address indexed pair, address indexed token0, address indexed token1, uint256 amount0, uint256 amount1
+    );
 
     error InvalidConfig();
     error UnknownLock();
     error Locked();
 
-    constructor(address owner_) ArborOwnable(owner_) {}
+    constructor(address owner_) ArborOwnable(owner_) { }
 
     function registerLock(
         address lpToken,

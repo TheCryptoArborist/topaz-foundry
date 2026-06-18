@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ArborFoundryTypes} from "./ArborFoundryTypes.sol";
-import {SaleVault} from "./SaleVault.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
-import {ITopazV2Factory} from "./interfaces/ITopazV2Factory.sol";
-import {ITopazV2Router} from "./interfaces/ITopazV2Router.sol";
-import {ArborOwnable} from "./lib/ArborOwnable.sol";
-import {ArborReentrancyGuard} from "./lib/ArborReentrancyGuard.sol";
-import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import { ArborFoundryTypes } from "./ArborFoundryTypes.sol";
+import { SaleVault } from "./SaleVault.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { ITopazV2Factory } from "./interfaces/ITopazV2Factory.sol";
+import { ITopazV2Router } from "./interfaces/ITopazV2Router.sol";
+import { ArborOwnable } from "./lib/ArborOwnable.sol";
+import { ArborReentrancyGuard } from "./lib/ArborReentrancyGuard.sol";
+import { SafeTransferLib } from "./lib/SafeTransferLib.sol";
 
 contract TopazFinalizer is ArborOwnable, ArborReentrancyGuard {
     using SafeTransferLib for IERC20;
@@ -92,11 +92,10 @@ contract TopazFinalizer is ArborOwnable, ArborReentrancyGuard {
             IERC20(params.token).safeTransfer(msg.sender, params.tokenAmountDesired - tokenUsed);
         }
         if (accounting.quoteToLiquidity > quoteUsed) {
-            IERC20(params.quoteToken).safeTransfer(params.creatorProceedsReceiver, accounting.quoteToLiquidity - quoteUsed);
+            IERC20(params.quoteToken)
+                .safeTransfer(params.creatorProceedsReceiver, accounting.quoteToLiquidity - quoteUsed);
         }
 
-        emit LaunchFinalized(
-            params.launch, pair, params.lpReceiver, quoteUsed, tokenUsed, lpMinted
-        );
+        emit LaunchFinalized(params.launch, pair, params.lpReceiver, quoteUsed, tokenUsed, lpMinted);
     }
 }

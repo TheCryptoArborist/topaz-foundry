@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ArborFoundryTypes} from "./ArborFoundryTypes.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
-import {ArborReentrancyGuard} from "./lib/ArborReentrancyGuard.sol";
-import {SafeTransferLib} from "./lib/SafeTransferLib.sol";
+import { ArborFoundryTypes } from "./ArborFoundryTypes.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
+import { ArborReentrancyGuard } from "./lib/ArborReentrancyGuard.sol";
+import { SafeTransferLib } from "./lib/SafeTransferLib.sol";
 
 contract SaleVault is ArborReentrancyGuard {
     using SafeTransferLib for IERC20;
@@ -33,10 +33,7 @@ contract SaleVault is ArborReentrancyGuard {
     event FinalizerSet(address indexed finalizer);
     event TreasurySet(address indexed treasury);
     event QuoteReleasedForFinalization(
-        uint256 totalRaised,
-        uint256 platformFee,
-        uint256 quoteToLiquidity,
-        uint256 creatorProceeds
+        uint256 totalRaised, uint256 platformFee, uint256 quoteToLiquidity, uint256 creatorProceeds
     );
 
     error NotFactory();
