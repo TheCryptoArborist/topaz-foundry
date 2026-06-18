@@ -225,6 +225,8 @@ BNB Chain anchors from the current design brief:
 | Topaz Voter | `0x2F80F810a114223AC69E34E84E735CaD515dAD67` |
 | WBNB | `0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c` |
 
+ABI confirmation: see `docs/topaz-v2-abi-confirmation.md`. The MVP router/factory/pool functions were checked against Sourcify full-match metadata and live BNB Chain RPC on June 18, 2026.
+
 MVP Topaz assumptions:
 
 - BNB Chain mainnet, chain ID `56`.
@@ -238,7 +240,7 @@ Finalizer must:
 
 - Check existing pool via factory.
 - Create pool if missing.
-- Quote liquidity before execution.
+- Quote liquidity before execution. Live router signature is `quoteAddLiquidity(tokenA, tokenB, stable, factory, amountADesired, amountBDesired)`.
 - Use nonzero minimum amounts for slippage safety.
 - Add liquidity through router.
 - Send LP token directly to locker.
@@ -511,7 +513,7 @@ Before BNB mainnet:
 ## 12. Open Decisions
 
 - Confirm first quote assets: USDT only, WBNB only, or both.
-- Confirm Topaz V2 ABI details against live contracts.
+- Reconfirm Topaz V2 ABI details immediately before deployment; MVP router/factory/pool functions are currently matched in `docs/topaz-v2-abi-confirmation.md`.
 - Decide whether Arbor Foundry deploys project tokens or only accepts existing verified tokens.
 - Decide LP lock default: 12 months, 24 months, or permanent fee-split.
 - Decide whether launch incentives are required or optional.
@@ -537,4 +539,4 @@ The current frontend prototype already represents:
 - Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
 - Foundry test suite for refund, finalization accounting, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
 
-The next engineering step is to confirm the Topaz V2 ABIs before any testnet deployment, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.
+The next engineering step is a local fork dry run against the live Topaz V2 router/factory, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.

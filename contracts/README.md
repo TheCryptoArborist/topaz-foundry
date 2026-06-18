@@ -51,7 +51,7 @@ Before mainnet:
 
 1. Install Foundry.
 2. Expand unit tests for sale windows, cancellation, treasury/finalizer admin changes, LP unlock restrictions, and edge-case rounding.
-3. Confirm Topaz V2 ABIs against the live BNB Chain contracts.
+3. Reconfirm Topaz V2 ABIs against the live BNB Chain contracts immediately before deployment. Current MVP interface confirmation is in `../docs/topaz-v2-abi-confirmation.md`.
 4. Run a BNB testnet or local fork dry run.
 5. Get external security review before handling user funds.
 

@@ -368,7 +368,7 @@ contract MockTopazRouter is ITopazV2Router {
         factory = factory_;
     }
 
-    function quoteAddLiquidity(address, address, bool, uint256 amountADesired, uint256 amountBDesired)
+    function quoteAddLiquidity(address, address, bool, address, uint256 amountADesired, uint256 amountBDesired)
         external
         pure
         returns (uint256 amountA, uint256 amountB, uint256 liquidity)

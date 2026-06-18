@@ -219,7 +219,7 @@ Default launch settings:
 - LP asset: fungible ERC20 LP token, where the pool address is also the LP token address.
 - First fee path: non-gauged V2 LP fees claimed by the launchpad locker with `pool.claimFees()`.
 
-The launchpad should quote liquidity with `quoteAddLiquidity`, apply nonzero slippage minimums, approve both assets to the Topaz router, and call `addLiquidity(..., to = locker, ...)` so ERC20 LP tokens are minted directly into the fee-split locker.
+The launchpad should quote liquidity with the live router signature `quoteAddLiquidity(tokenA, tokenB, stable, factory, amountADesired, amountBDesired)`, apply nonzero slippage minimums, approve both assets to the Topaz router, and call `addLiquidity(..., to = locker, ...)` so ERC20 LP tokens are minted directly into the fee-split locker.
 
 Important fee distinction:
 

@@ -2130,7 +2130,7 @@ function renderIntegrationView() {
   const abiRows = [
     ["Factory", "getPool(tokenA, tokenB, stable)", "Find existing V2 pool"],
     ["Factory", "createPool(tokenA, tokenB, stable)", "Create volatile pool if missing"],
-    ["Router", "quoteAddLiquidity(...)", "Preview amounts and LP output"],
+    ["Router", "quoteAddLiquidity(..., factory, ...)", "Preview amounts and LP output"],
     ["Router", "addLiquidity(..., to=locker, ...)", "Mint ERC20 LP directly to locker"],
     ["Pool", "claimFees()", "Claim token0/token1 fees into locker"],
     ["Pool", "claimable0/claimable1(account)", "Preview locker fee accrual"],
@@ -2139,7 +2139,7 @@ function renderIntegrationView() {
     ["1", "Bonding completes", "Project token and quote asset are in the sale vault."],
     ["2", "Choose quote", "Use WBNB or USDT for normal launches."],
     ["3", "Use stable=false", "New launch tokens use volatile constant-product pools."],
-    ["4", "Quote liquidity", "Call quoteAddLiquidity and apply nonzero slippage mins."],
+    ["4", "Quote liquidity", "Call quoteAddLiquidity with the factory address and apply nonzero slippage mins."],
     ["5", "Mint LP to locker", "Call addLiquidity with the locker as recipient."],
     ["6", "Claim and split fees", "Locker calls pool.claimFees while the pool is non-gauged."],
   ];

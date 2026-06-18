@@ -10,6 +10,8 @@ Technical build spec: `docs/arbor-foundry-mvp-technical-spec.md`
 
 Smart contract scaffold: `contracts/README.md`
 
+Topaz V2 ABI confirmation: `docs/topaz-v2-abi-confirmation.md`
+
 The prototype shows:
 
 - Launch list tabs for approved, live, upcoming, finalized, and refunding launches.
