@@ -649,6 +649,8 @@ const contractSelectors = {
   status: "0x200d2ed2",
   totalRaised: "0xc5c4744c",
   previewAccounting: "0x6ebd5c67",
+  config: "0x79502c55",
+  saleTokensFunded: "0x4ad01a45",
   createLaunch: "0x9853ac9d",
   erc20Approve: "0x095ea7b3",
   fundSaleTokens: "0x163fef89",
@@ -950,6 +952,16 @@ function formatUnits(value, decimals = 18, places = 2) {
   const wholeText = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const trimmedFraction = fractionText.replace(/0+$/, "");
   return trimmedFraction ? `${wholeText}.${trimmedFraction}` : wholeText;
+}
+
+function formUnits(value, decimals = 18) {
+  return formatUnits(value, decimals, 6).replace(/,/g, "");
+}
+
+function basisPointsToPercent(value) {
+  const bps = Number(value || 0);
+  const percent = bps / 100;
+  return Number.isInteger(percent) ? percent.toString() : percent.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function explorerAddressUrl(address) {
@@ -1257,6 +1269,70 @@ async function runTestnetLaunchAction(action) {
   }
 }
 
+function decodeLaunchConfig(result) {
+  return {
+    creator: decodeAddress(result, 0),
+    saleToken: decodeAddress(result, 1),
+    quoteToken: decodeAddress(result, 2),
+    saleType: decodeUint256(result, 3),
+    setupMode: decodeUint256(result, 4),
+    saleTokenAmount: decodeUint256(result, 5),
+    softCap: decodeUint256(result, 6),
+    hardCap: decodeUint256(result, 7),
+    walletMin: decodeUint256(result, 8),
+    walletMax: decodeUint256(result, 9),
+    startsAt: decodeUint256(result, 10),
+    endsAt: decodeUint256(result, 11),
+    liquidityBps: decodeUint256(result, 12),
+    platformFeeBps: decodeUint256(result, 13),
+  };
+}
+
+function testnetLaunchNextAction(launch) {
+  if (!launch) return "Select a launch";
+  if (launch.statusLabel === "Draft") {
+    return launch.saleTokensFunded ? "Approve launch" : "Approve tokens, fund vault, approve launch";
+  }
+  if (launch.statusLabel === "Approved" || launch.statusLabel === "Upcoming") {
+    return launch.saleTokensFunded ? "Open launch" : "Approve tokens, fund vault, open launch";
+  }
+  if (launch.statusLabel === "Live") return "Accepting deposits";
+  if (launch.statusLabel === "Finalized") return "Finalized";
+  if (launch.statusLabel === "Refunding") return "Refund path proven";
+  return "Awaiting action";
+}
+
+function resumableTestnetLaunch(launch) {
+  return ["Draft", "Approved", "Upcoming"].includes(launch?.statusLabel);
+}
+
+function resumeTestnetLaunch(launchAddress) {
+  const launch = (state.testnetData.launches || []).find((item) => addressMatches(item.address, launchAddress));
+  if (!launch) {
+    showToast("Refresh testnet reads, then try that SaleVault again.");
+    return;
+  }
+
+  const config = launch.config || {};
+  state.wizardForm.saleToken = config.saleToken || state.wizardForm.saleToken;
+  state.wizardForm.saleTokenAmount = config.saleTokenAmount === undefined ? state.wizardForm.saleTokenAmount : formUnits(config.saleTokenAmount);
+  state.wizardForm.saleType = String(config.saleType ?? state.wizardForm.saleType);
+  state.wizardForm.softCap = config.softCap === undefined ? state.wizardForm.softCap : formUnits(config.softCap);
+  state.wizardForm.hardCap = config.hardCap === undefined ? state.wizardForm.hardCap : formUnits(config.hardCap);
+  state.wizardForm.walletMin = config.walletMin === undefined ? state.wizardForm.walletMin : formUnits(config.walletMin);
+  state.wizardForm.walletMax = config.walletMax === undefined ? state.wizardForm.walletMax : formUnits(config.walletMax);
+  state.wizardForm.liquidityPercent = basisPointsToPercent(config.liquidityBps ?? parseBasisPoints(state.wizardForm.liquidityPercent));
+  state.testnetLaunchTx = {
+    status: `Resumed ${launch.statusLabel} SaleVault. Next: ${testnetLaunchNextAction(launch)}.`,
+    hash: "",
+    launchAddress: launch.address,
+    error: "",
+  };
+  state.wizardStep = wizardSteps.length - 1;
+  renderApp();
+  showToast(`Resumed ${shortAddress(launch.address)}.`);
+}
+
 async function readLaunchFactory() {
   const factory = bnbTestnet.contracts.launchFactory;
   const owner = decodeAddress(await ethCall(factory, contractSelectors.owner));
@@ -1297,11 +1373,15 @@ async function readSaleVault(address, index) {
   const status = Number(decodeUint256(await ethCall(address, contractSelectors.status)));
   const totalRaised = decodeUint256(await ethCall(address, contractSelectors.totalRaised));
   const accounting = await ethCall(address, contractSelectors.previewAccounting);
+  const config = decodeLaunchConfig(await ethCall(address, contractSelectors.config));
+  const saleTokensFunded = decodeBool(await ethCall(address, contractSelectors.saleTokensFunded));
   return {
     index,
     address,
     status,
     statusLabel: launchStatusLabels[status] || `Status ${status}`,
+    config,
+    saleTokensFunded,
     totalRaised,
     platformFee: decodeUint256(accounting, 1),
     netRaise: decodeUint256(accounting, 2),
@@ -2710,7 +2790,7 @@ function testnetCheckRows() {
 function testnetLaunchRows() {
   const rows = state.testnetData.launches || [];
   if (!rows.length) {
-    return [["No sale vaults read yet", "Run refresh after rehearsals", "0 USDT", "0 USDT", "Waiting"]];
+    return [["No sale vaults read yet", "Run refresh after rehearsals", "0 USDT", "0 USDT", "Waiting", "Refresh"]];
   }
 
   return rows.map((launch) => [
@@ -2722,8 +2802,24 @@ function testnetLaunchRows() {
       ? `${formatUnits(launch.quoteToLiquidity)} USDT to LP`
       : launch.statusLabel === "Refunding"
         ? "Refund path proven"
-        : "Awaiting action",
+        : testnetLaunchNextAction(launch),
+    resumableTestnetLaunch(launch)
+      ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
+      : `<span class="micro">${launch.statusLabel === "Live" ? "Deposits open" : "No setup action"}</span>`,
   ]);
+}
+
+function renderTestnetResumePanel() {
+  if (isEvmAddress(state.testnetLaunchTx.launchAddress)) {
+    return renderTestnetLaunchWriter();
+  }
+
+  return `
+    <section class="panel pad callout">
+      <h3>Continue A Test Launch</h3>
+      <p class="muted">Choose Continue setup beside a Draft, Approved, or Upcoming SaleVault. Arbor Foundry will load that on-chain launch into the action panel so you can approve tokens, fund the vault, approve the launch, and open it.</p>
+    </section>
+  `;
 }
 
 function renderTestnetView() {
@@ -2740,7 +2836,7 @@ function renderTestnetView() {
         ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected", state.walletStatus],
         ["Network", testnetNetworkLabel(), state.connected ? `Wallet chain ${chainIdLabel(state.walletChainId)}` : "Public read fallback"],
         ["LaunchFactory count", launchCountLabel, state.testnetLastUpdated ? `Last read ${state.testnetLastUpdated}` : "Refresh to read chain"],
-        ["Mode", "Read-only", "No transactions from the website yet"],
+        ["Mode", "Read + resume", "Continue setup from SaleVault rows"],
       ])}
       ${state.testnetError ? `<section class="panel pad warning-panel"><strong>Testnet read issue</strong><p class="muted">${state.testnetError}</p></section>` : ""}
       <section class="panel pad">
@@ -2760,11 +2856,11 @@ function renderTestnetView() {
         </section>
         <section class="panel pad callout">
           <h3>What This Proves</h3>
-          <p class="muted">This page reads the same deployed testnet stack used by the success and refund rehearsals. It does not create launches, deposit, finalize, or claim refunds from the browser yet.</p>
+          <p class="muted">This page reads the deployed testnet stack and lets the owner wallet resume setup for Draft, Approved, or Upcoming SaleVaults without starting a new launch.</p>
           <div class="review-list">
             <div class="review-row"><span>Successful path</span><strong>Finalized on testnet</strong></div>
             <div class="review-row"><span>Refund path</span><strong>Refunding on testnet</strong></div>
-            <div class="review-row"><span>Next build layer</span><strong>Wallet write buttons</strong></div>
+            <div class="review-row"><span>Resume path</span><strong>Continue setup from real SaleVaults</strong></div>
           </div>
         </section>
       </div>
@@ -2773,8 +2869,9 @@ function renderTestnetView() {
           <h3>Latest Sale Vaults</h3>
           <span class="micro">Most recent contracts from LaunchFactory</span>
         </div>
-        ${renderDataTable(["Launch", "Status", "Raised", "Refund total", "Outcome"], testnetLaunchRows())}
+        ${renderDataTable(["Launch", "Status", "Raised", "Refund total", "Next", "Action"], testnetLaunchRows())}
       </section>
+      ${renderTestnetResumePanel()}
     </div>
   `;
 }
@@ -3581,7 +3678,13 @@ function renderTestnetLaunchWriter() {
   const tx = state.testnetLaunchTx;
   const errors = testnetLaunchValidation();
   const launchAddress = tx.launchAddress;
-  const canRunVaultActions = isEvmAddress(launchAddress) && Number(form.saleType) === 0;
+  const hasLaunch = isEvmAddress(launchAddress);
+  const canRunVaultActions =
+    hasLaunch &&
+    Number(form.saleType) === 0 &&
+    state.connected &&
+    isWalletOnBnbTestnet() &&
+    addressMatches(state.walletAddress, bnbTestnet.expectedOwner);
   const status = tx.status || "Ready after all required fields are filled.";
   const txLink = tx.hash ? `<a class="address-link" href="${explorerTxLink(tx.hash)}" target="_blank" rel="noreferrer">${shortAddress(tx.hash)}</a>` : "Not sent";
   const launchLink = isEvmAddress(launchAddress)
@@ -3591,12 +3694,12 @@ function renderTestnetLaunchWriter() {
   return `
     <div class="testnet-writer">
       <div class="panel-title">
-        <h3>BNB Testnet Transaction</h3>
-        <span class="micro">Admin MVP path</span>
+        <h3>${hasLaunch ? "Continue Testnet Launch" : "BNB Testnet Transaction"}</h3>
+        <span class="micro">${hasLaunch ? "Selected SaleVault" : "Admin MVP path"}</span>
       </div>
       <div class="assist-note">
-        <strong>What this sends</strong>
-        <span>This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches.</span>
+        <strong>${hasLaunch ? "What this controls" : "What this sends"}</strong>
+        <span>${hasLaunch ? "This resumes the selected on-chain SaleVault and sends the remaining setup transactions from the owner wallet." : "This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches."}</span>
       </div>
       <div class="review-list">
         ${[
@@ -3620,7 +3723,7 @@ function renderTestnetLaunchWriter() {
       ${tx.error ? `<div class="form-error"><span>${escapeHtml(tx.error)}</span></div>` : ""}
       <div class="tx-status">${escapeHtml(status)}</div>
       <div class="tx-actions">
-        <button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>Create Draft On Testnet</button>
+        <button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>${hasLaunch ? "Create Another Draft" : "Create Draft On Testnet"}</button>
         <button class="button" type="button" data-action="approve-sale-token" ${canRunVaultActions ? "" : "disabled"}>Approve Sale Tokens</button>
         <button class="button" type="button" data-action="fund-sale-tokens" ${canRunVaultActions ? "" : "disabled"}>Fund Vault</button>
         <button class="button gold" type="button" data-action="approve-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Approve Launch</button>
@@ -3894,6 +3997,9 @@ async function handleClick(event) {
       break;
     case "create-testnet-launch":
       await createTestnetLaunchDraft();
+      break;
+    case "resume-testnet-launch":
+      resumeTestnetLaunch(target.dataset.launchAddress);
       break;
     case "approve-sale-token":
       await runTestnetLaunchAction("approveSaleToken");
