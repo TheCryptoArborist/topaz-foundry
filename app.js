@@ -469,6 +469,17 @@ const state = {
   tab: "live",
   selectedId: "aurora",
   connected: false,
+  walletAddress: "",
+  walletChainId: "",
+  walletStatus: "Not connected",
+  testnetLoading: false,
+  testnetError: "",
+  testnetLastUpdated: "",
+  testnetData: {
+    launchCount: null,
+    checks: [],
+    launches: [],
+  },
   contribution: "",
   wizardOpen: false,
   wizardStep: 0,
@@ -514,6 +525,7 @@ const statusMeta = {
 
 const navItems = [
   { key: "launchpad", label: "Launchpad", icon: icons.launch },
+  { key: "testnet", label: "Testnet", icon: icons.wallet },
   { key: "portfolio", label: "My Contributions", icon: icons.stack },
   { key: "proof", label: "Verify Launches", icon: icons.lock },
   { key: "integration", label: "Topaz V2", icon: icons.doc },
@@ -566,6 +578,46 @@ const topazV2 = {
   stable: "false",
   poolType: "V2 volatile ERC20 LP",
 };
+
+const bnbTestnet = {
+  chain: "BNB Testnet",
+  chainId: 97,
+  chainIdHex: "0x61",
+  explorer: "https://testnet.bscscan.com",
+  rpcUrls: ["https://data-seed-prebsc-1-s1.binance.org:8545/"],
+  nativeCurrency: {
+    name: "Test BNB",
+    symbol: "tBNB",
+    decimals: 18,
+  },
+  contracts: {
+    launchFactory: "0xC6b44e114BD06c08257aC6EEEB409c022EDCb16B",
+    topazFinalizer: "0x4CfCBC52355bFf61bC99E8F0f43B38Fe5AAEa466",
+    lpLocker: "0xB00f7c3a599a01A1A4D9312633ca86f74bdF85Ce",
+    vestingVault: "0x109060137eF2C77980136aC2f9e72353f2Aa45Ce",
+    incentiveEscrow: "0x8BAE46797C58B5870F65EB564D53CA11bb3b7a35",
+    mockTopazFactory: "0x3eF32427eB1eA6cE7572358e22C800CeC740292A",
+    mockTopazRouter: "0x8a7C0b2Dc04C54eC8932Cf4cb28aC6F4f881398E",
+    mockUsdt: "0xA7C16a4CadA1c3bCC884904144B372aB09674A1d",
+  },
+  expectedOwner: "0xE8b63245DdDAB73C7A276818942341D8Cfb7D7A7",
+  platformTreasury: "0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE",
+};
+
+const contractSelectors = {
+  launchCount: "0x27cca59f",
+  allLaunches: "0x41d6e9d3",
+  owner: "0x8da5cb5b",
+  platformTreasury: "0xe138818c",
+  finalizer: "0xe9dd248b",
+  quoteTokenAllowlistEnabled: "0x8dcb094c",
+  quoteTokenAllowed: "0xed723e27",
+  status: "0x200d2ed2",
+  totalRaised: "0xc5c4744c",
+  previewAccounting: "0x6ebd5c67",
+};
+
+const launchStatusLabels = ["Draft", "Pending Review", "Approved", "Upcoming", "Live", "Finalized", "Refunding", "Cancelled"];
 
 const platformEconomics = {
   successFeeBps: 200,
@@ -678,7 +730,237 @@ function money(value) {
 }
 
 function shortAddress(address) {
+  if (!address) return "Not connected";
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function normalizeAddress(address) {
+  return (address || "").toLowerCase();
+}
+
+function addressMatches(actual, expected) {
+  return normalizeAddress(actual) === normalizeAddress(expected);
+}
+
+function chainIdLabel(chainId) {
+  if (!chainId) return "Not connected";
+  const numeric = Number.parseInt(chainId, 16);
+  return Number.isNaN(numeric) ? chainId : `${numeric}`;
+}
+
+function isWalletOnBnbTestnet() {
+  return normalizeAddress(state.walletChainId) === normalizeAddress(bnbTestnet.chainIdHex);
+}
+
+function walletButtonLabel() {
+  if (!state.connected || !state.walletAddress) return "Connect Wallet";
+  return shortAddress(state.walletAddress);
+}
+
+function testnetNetworkLabel() {
+  if (!state.connected) return "BNB Testnet 97";
+  if (isWalletOnBnbTestnet()) return `BNB Testnet ${bnbTestnet.chainId}`;
+  return `Wrong chain ${chainIdLabel(state.walletChainId)}`;
+}
+
+function encodeUint256(value) {
+  return BigInt(value).toString(16).padStart(64, "0");
+}
+
+function encodeAddress(address) {
+  return normalizeAddress(address).replace(/^0x/, "").padStart(64, "0");
+}
+
+function decodeUint256(result, word = 0) {
+  const clean = (result || "0x").replace(/^0x/, "");
+  const start = word * 64;
+  const value = clean.slice(start, start + 64) || "0";
+  return BigInt(`0x${value}`);
+}
+
+function decodeBool(result, word = 0) {
+  return decodeUint256(result, word) === 1n;
+}
+
+function decodeAddress(result, word = 0) {
+  const clean = (result || "0x").replace(/^0x/, "");
+  const start = word * 64;
+  const value = clean.slice(start + 24, start + 64);
+  return value ? `0x${value}` : "";
+}
+
+function formatUnits(value, decimals = 18, places = 2) {
+  const amount = BigInt(value || 0);
+  const divisor = 10n ** BigInt(decimals);
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const fractionText = fraction.toString().padStart(decimals, "0").slice(0, places);
+  const wholeText = whole.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const trimmedFraction = fractionText.replace(/0+$/, "");
+  return trimmedFraction ? `${wholeText}.${trimmedFraction}` : wholeText;
+}
+
+function explorerAddressUrl(address) {
+  return `${bnbTestnet.explorer}/address/${address}`;
+}
+
+async function ethCall(to, data) {
+  const call = { to, data };
+  if (window.ethereum && state.connected && isWalletOnBnbTestnet()) {
+    return window.ethereum.request({
+      method: "eth_call",
+      params: [call, "latest"],
+    });
+  }
+
+  const response = await fetch(bnbTestnet.rpcUrls[0], {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "eth_call",
+      params: [call, "latest"],
+    }),
+  });
+  const payload = await response.json();
+  if (payload.error) throw new Error(payload.error.message || "BNB testnet RPC call failed.");
+  return payload.result;
+}
+
+async function readLaunchFactory() {
+  const factory = bnbTestnet.contracts.launchFactory;
+  const owner = decodeAddress(await ethCall(factory, contractSelectors.owner));
+  const treasury = decodeAddress(await ethCall(factory, contractSelectors.platformTreasury));
+  const finalizer = decodeAddress(await ethCall(factory, contractSelectors.finalizer));
+  const quoteAllowlistEnabled = decodeBool(await ethCall(factory, contractSelectors.quoteTokenAllowlistEnabled));
+  const quoteTokenAllowed = decodeBool(
+    await ethCall(factory, `${contractSelectors.quoteTokenAllowed}${encodeAddress(bnbTestnet.contracts.mockUsdt)}`),
+  );
+  const launchCount = Number(decodeUint256(await ethCall(factory, contractSelectors.launchCount)));
+
+  const launchesOnChain = [];
+  const start = Math.max(0, launchCount - 5);
+  for (let index = start; index < launchCount; index += 1) {
+    const launchAddress = decodeAddress(await ethCall(factory, `${contractSelectors.allLaunches}${encodeUint256(index)}`));
+    launchesOnChain.push(await readSaleVault(launchAddress, index));
+  }
+
+  return {
+    owner,
+    treasury,
+    finalizer,
+    quoteAllowlistEnabled,
+    quoteTokenAllowed,
+    launchCount,
+    checks: [
+      ["Owner", owner, bnbTestnet.expectedOwner, addressMatches(owner, bnbTestnet.expectedOwner)],
+      ["Platform treasury", treasury, bnbTestnet.platformTreasury, addressMatches(treasury, bnbTestnet.platformTreasury)],
+      ["Topaz finalizer", finalizer, bnbTestnet.contracts.topazFinalizer, addressMatches(finalizer, bnbTestnet.contracts.topazFinalizer)],
+      ["Quote allowlist", quoteAllowlistEnabled ? "Enabled" : "Disabled", "Enabled", quoteAllowlistEnabled],
+      ["Mock USDT allowed", quoteTokenAllowed ? "Allowed" : "Blocked", "Allowed", quoteTokenAllowed],
+    ],
+    launches: launchesOnChain.reverse(),
+  };
+}
+
+async function readSaleVault(address, index) {
+  const status = Number(decodeUint256(await ethCall(address, contractSelectors.status)));
+  const totalRaised = decodeUint256(await ethCall(address, contractSelectors.totalRaised));
+  const accounting = await ethCall(address, contractSelectors.previewAccounting);
+  return {
+    index,
+    address,
+    status,
+    statusLabel: launchStatusLabels[status] || `Status ${status}`,
+    totalRaised,
+    platformFee: decodeUint256(accounting, 1),
+    netRaise: decodeUint256(accounting, 2),
+    quoteToLiquidity: decodeUint256(accounting, 3),
+    creatorProceeds: decodeUint256(accounting, 4),
+    refundTotal: decodeUint256(accounting, 5),
+  };
+}
+
+async function refreshTestnetData(silent = false) {
+  state.testnetLoading = true;
+  state.testnetError = "";
+  if (!silent) renderApp();
+
+  try {
+    const data = await readLaunchFactory();
+    state.testnetData = data;
+    state.testnetLastUpdated = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } catch (error) {
+    state.testnetError = error.message || "Could not read BNB testnet contracts.";
+  } finally {
+    state.testnetLoading = false;
+    renderApp();
+  }
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    state.connected = false;
+    state.walletAddress = "";
+    state.walletChainId = "";
+    state.walletStatus = "No injected EVM wallet found.";
+    renderApp();
+    showToast("Install or unlock MetaMask/Rabby to connect a BNB testnet wallet.");
+    return;
+  }
+
+  try {
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const chainId = await window.ethereum.request({ method: "eth_chainId" });
+    state.connected = Boolean(accounts.length);
+    state.walletAddress = accounts[0] || "";
+    state.walletChainId = chainId;
+    state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+    renderApp();
+    showToast(isWalletOnBnbTestnet() ? "Wallet connected to BNB testnet." : "Wallet connected. Switch to BNB testnet before transactions.");
+    await refreshTestnetData(true);
+  } catch (error) {
+    state.walletStatus = error.message || "Wallet connection rejected.";
+    renderApp();
+    showToast("Wallet connection was not completed.");
+  }
+}
+
+async function switchToBnbTestnet() {
+  if (!window.ethereum) {
+    showToast("No browser wallet found.");
+    return;
+  }
+
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: bnbTestnet.chainIdHex }],
+    });
+  } catch (error) {
+    if (error.code !== 4902) {
+      showToast("Wallet did not switch networks.");
+      return;
+    }
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: bnbTestnet.chainIdHex,
+          chainName: "BNB Smart Chain Testnet",
+          nativeCurrency: bnbTestnet.nativeCurrency,
+          rpcUrls: bnbTestnet.rpcUrls,
+          blockExplorerUrls: [bnbTestnet.explorer],
+        },
+      ],
+    });
+  }
+
+  state.walletChainId = await window.ethereum.request({ method: "eth_chainId" });
+  state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+  renderApp();
+  await refreshTestnetData(true);
 }
 
 function statusLabel(status) {
@@ -1295,11 +1577,13 @@ function renderTopbar() {
     <header class="topbar">
       <div class="tagline">Independent launches. Liquidity rooted on Topaz.</div>
       <div class="topbar-actions">
-        <div class="network-pill"><span class="dot"></span>BNB Chain 56</div>
+        <div class="network-pill ${state.connected && !isWalletOnBnbTestnet() ? "warn" : ""}">
+          <span class="dot"></span>${testnetNetworkLabel()}
+        </div>
         <button class="button gold" type="button" data-action="open-wizard">${icons.plus} New launch</button>
         <button class="button primary" type="button" data-action="connect-wallet">
           ${icons.wallet}
-          ${state.connected ? "Wallet Connected" : "Connect Wallet"}
+          ${walletButtonLabel()}
         </button>
       </div>
     </header>
@@ -1949,6 +2233,120 @@ function renderDataTable(headers, rows) {
 
 function launchById(id) {
   return launches.find((launch) => launch.id === id) || launches[0];
+}
+
+function renderAddressLink(address) {
+  if (!address) return "Not available";
+  return `<a class="address-link" href="${explorerAddressUrl(address)}" target="_blank" rel="noopener noreferrer">${shortAddress(address)}</a>`;
+}
+
+function renderTestnetActions() {
+  return `
+    <div class="header-actions">
+      <button class="button ghost" type="button" data-action="refresh-testnet">${state.testnetLoading ? "Refreshing" : "Refresh reads"}</button>
+      ${state.connected && !isWalletOnBnbTestnet() ? '<button class="button gold" type="button" data-action="switch-testnet">Switch to testnet</button>' : ""}
+      <button class="button primary" type="button" data-action="connect-wallet">${icons.wallet} ${walletButtonLabel()}</button>
+    </div>
+  `;
+}
+
+function testnetContractRows() {
+  return [
+    ["LaunchFactory", bnbTestnet.contracts.launchFactory, "Creates and tracks launch vaults"],
+    ["TopazFinalizer", bnbTestnet.contracts.topazFinalizer, "Routes successful launches into mock Topaz liquidity"],
+    ["FeeSplitLPLocker", bnbTestnet.contracts.lpLocker, "Receives LP tokens and records lock proof"],
+    ["VestingVault", bnbTestnet.contracts.vestingVault, "Vesting rehearsal anchor"],
+    ["IncentiveEscrow", bnbTestnet.contracts.incentiveEscrow, "Incentive rehearsal anchor"],
+    ["Mock USDT", bnbTestnet.contracts.mockUsdt, "Allowed quote token for testnet rehearsals"],
+    ["Mock Topaz Factory", bnbTestnet.contracts.mockTopazFactory, "Creates mock Topaz V2 pairs"],
+    ["Mock Topaz Router", bnbTestnet.contracts.mockTopazRouter, "Adds mock Topaz V2 liquidity"],
+  ].map(([label, address, use]) => [label, renderAddressLink(address), use]);
+}
+
+function testnetCheckRows() {
+  const checks = state.testnetData.checks || [];
+  if (!checks.length) {
+    return [["Read status", state.testnetError || "Not loaded yet", "Click refresh reads", state.testnetLoading ? "Loading" : "Waiting"]];
+  }
+
+  return checks.map(([label, actual, expected, passed]) => [
+    label,
+    typeof actual === "string" && actual.startsWith("0x") ? renderAddressLink(actual) : actual,
+    typeof expected === "string" && expected.startsWith("0x") ? renderAddressLink(expected) : expected,
+    `<span class="status ${passed ? "ready" : "refunding"}">${passed ? "Match" : "Check"}</span>`,
+  ]);
+}
+
+function testnetLaunchRows() {
+  const rows = state.testnetData.launches || [];
+  if (!rows.length) {
+    return [["No sale vaults read yet", "Run refresh after rehearsals", "0 USDT", "0 USDT", "Waiting"]];
+  }
+
+  return rows.map((launch) => [
+    `#${launch.index + 1} ${renderAddressLink(launch.address)}`,
+    `<span class="status ${launch.statusLabel.toLowerCase().replace(/\s+/g, "-")}">${launch.statusLabel}</span>`,
+    `${formatUnits(launch.totalRaised)} USDT`,
+    `${formatUnits(launch.refundTotal)} USDT`,
+    launch.statusLabel === "Finalized"
+      ? `${formatUnits(launch.quoteToLiquidity)} USDT to LP`
+      : launch.statusLabel === "Refunding"
+        ? "Refund path proven"
+        : "Awaiting action",
+  ]);
+}
+
+function renderTestnetView() {
+  const count = state.testnetData.launchCount;
+  const launchCountLabel = count === null || count === undefined ? "Not read" : count.toString();
+  return `
+    <div class="page-stack">
+      ${renderPageHeader(
+        "BNB Testnet Wiring",
+        "Read-only wallet and contract status for the deployed Arbor Foundry rehearsal stack.",
+        renderTestnetActions(),
+      )}
+      ${renderKpiGrid([
+        ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected", state.walletStatus],
+        ["Network", testnetNetworkLabel(), state.connected ? `Wallet chain ${chainIdLabel(state.walletChainId)}` : "Public read fallback"],
+        ["LaunchFactory count", launchCountLabel, state.testnetLastUpdated ? `Last read ${state.testnetLastUpdated}` : "Refresh to read chain"],
+        ["Mode", "Read-only", "No transactions from the website yet"],
+      ])}
+      ${state.testnetError ? `<section class="panel pad warning-panel"><strong>Testnet read issue</strong><p class="muted">${state.testnetError}</p></section>` : ""}
+      <section class="panel pad">
+        <div class="panel-title">
+          <h3>Deployed Testnet Contracts</h3>
+          <span class="micro">BNB testnet chain id ${bnbTestnet.chainId}</span>
+        </div>
+        ${renderDataTable(["Contract", "Address", "Use"], testnetContractRows())}
+      </section>
+      <div class="split-layout wide-left">
+        <section class="panel pad">
+          <div class="panel-title">
+            <h3>Live Wiring Checks</h3>
+            <span class="micro">${state.testnetLoading ? "Reading chain" : "Read-only eth_call"}</span>
+          </div>
+          ${renderDataTable(["Check", "Actual", "Expected", "Status"], testnetCheckRows())}
+        </section>
+        <section class="panel pad callout">
+          <h3>What This Proves</h3>
+          <p class="muted">This page reads the same deployed testnet stack used by the success and refund rehearsals. It does not create launches, deposit, finalize, or claim refunds from the browser yet.</p>
+          <div class="review-list">
+            <div class="review-row"><span>Successful path</span><strong>Finalized on testnet</strong></div>
+            <div class="review-row"><span>Refund path</span><strong>Refunding on testnet</strong></div>
+            <div class="review-row"><span>Next build layer</span><strong>Wallet write buttons</strong></div>
+          </div>
+        </section>
+      </div>
+      <section class="panel pad">
+        <div class="panel-title">
+          <h3>Latest Sale Vaults</h3>
+          <span class="micro">Most recent contracts from LaunchFactory</span>
+        </div>
+        ${renderDataTable(["Launch", "Status", "Raised", "Refund total", "Outcome"], testnetLaunchRows())}
+      </section>
+    </div>
+  `;
 }
 
 function renderLaunchpadView() {
@@ -2604,6 +3002,8 @@ function renderAdminView() {
 
 function renderCurrentView() {
   switch (state.view) {
+    case "testnet":
+      return renderTestnetView();
     case "portfolio":
       return renderPortfolioView();
     case "proof":
@@ -2877,7 +3277,7 @@ function copyText(text, successMessage) {
   showToast("Copy text is visible in the share card.");
 }
 
-function handleClick(event) {
+async function handleClick(event) {
   const target = event.target.closest("button, .drawer-backdrop");
   if (!target) return;
 
@@ -2925,15 +3325,17 @@ function handleClick(event) {
 
   switch (target.dataset.action) {
     case "connect-wallet":
-      state.connected = !state.connected;
-      renderApp();
-      showToast(state.connected ? "Wallet connected for prototype mode." : "Wallet disconnected.");
+      await connectWallet();
+      break;
+    case "refresh-testnet":
+      await refreshTestnetData();
+      break;
+    case "switch-testnet":
+      await switchToBnbTestnet();
       break;
     case "contribute":
       if (!state.connected) {
-        state.connected = true;
-        renderApp();
-        showToast("Wallet connected. Enter an amount to simulate contribution.");
+        await connectWallet();
       } else {
         showToast("Contribution preview ready. No transaction was sent.");
       }
@@ -3006,3 +3408,31 @@ function handleInput(event) {
 app.addEventListener("click", handleClick);
 app.addEventListener("input", handleInput);
 renderApp();
+refreshTestnetData(true);
+
+if (window.ethereum) {
+  window.ethereum.request({ method: "eth_accounts" }).then((accounts) => {
+    if (!accounts.length) return;
+    state.connected = true;
+    state.walletAddress = accounts[0];
+    return window.ethereum.request({ method: "eth_chainId" }).then((chainId) => {
+      state.walletChainId = chainId;
+      state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+      renderApp();
+    });
+  }).catch(() => {});
+
+  window.ethereum.on?.("accountsChanged", (accounts) => {
+    state.connected = Boolean(accounts.length);
+    state.walletAddress = accounts[0] || "";
+    state.walletStatus = state.connected ? state.walletStatus : "Not connected";
+    renderApp();
+  });
+
+  window.ethereum.on?.("chainChanged", (chainId) => {
+    state.walletChainId = chainId;
+    state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+    renderApp();
+    refreshTestnetData(true);
+  });
+}

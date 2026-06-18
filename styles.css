@@ -222,6 +222,17 @@ button {
   font-size: 13px;
 }
 
+.network-pill.warn {
+  border-color: rgba(242, 200, 75, 0.38);
+  color: #ffe185;
+  background: rgba(242, 200, 75, 0.09);
+}
+
+.network-pill.warn .dot {
+  background: var(--gold);
+  box-shadow: 0 0 14px rgba(242, 200, 75, 0.7);
+}
+
 .dot {
   width: 8px;
   height: 8px;
@@ -247,6 +258,13 @@ button {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
+}
+
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 h1,
@@ -1366,6 +1384,25 @@ h3 {
   line-height: 1.5;
 }
 
+.warning-panel {
+  border-color: rgba(242, 200, 75, 0.34);
+  background:
+    linear-gradient(180deg, rgba(242, 200, 75, 0.1), rgba(255, 255, 255, 0.025)),
+    var(--surface);
+}
+
+.address-link {
+  color: var(--teal);
+  text-decoration: none;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.address-link:hover {
+  text-decoration: underline;
+}
+
 .drawer {
   position: fixed;
   inset: 0;
@@ -1641,6 +1678,11 @@ h3 {
     flex-wrap: wrap;
   }
 
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .data-head,
   .data-row {
     min-width: 680px;
@@ -1790,13 +1832,15 @@ h3 {
 
   .drawer-actions,
   .social-actions,
-  .share-actions {
+  .share-actions,
+  .header-actions {
     width: 100%;
   }
 
   .drawer-actions .button,
   .social-actions .button,
-  .share-actions .button {
+  .share-actions .button,
+  .header-actions .button {
     flex: 1 1 100%;
   }
 
