@@ -1590,6 +1590,54 @@ h3 {
   text-align: right;
 }
 
+.testnet-writer {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1px solid rgba(54, 230, 182, 0.24);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(54, 230, 182, 0.055);
+}
+
+.form-error {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(242, 200, 75, 0.34);
+  border-radius: var(--radius);
+  padding: 10px;
+  color: #ffe185;
+  background: rgba(242, 200, 75, 0.08);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tx-status {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px;
+  color: var(--text-soft);
+  background: rgba(5, 12, 14, 0.42);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tx-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tx-actions .button:first-child,
+.tx-actions .button:last-child {
+  grid-column: 1 / -1;
+}
+
+.tx-footnote {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .address-code {
   max-width: min(100%, 420px);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -1799,7 +1847,8 @@ h3 {
   .split-layout.wide-left,
   .form-grid,
   .wizard-help,
-  .wizard-steps {
+  .wizard-steps,
+  .tx-actions {
     grid-template-columns: 1fr;
   }
 

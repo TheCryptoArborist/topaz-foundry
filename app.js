@@ -483,6 +483,33 @@ const state = {
   contribution: "",
   wizardOpen: false,
   wizardStep: 0,
+  wizardForm: {
+    tokenName: "Aurora",
+    symbol: "AUR",
+    saleToken: "",
+    saleTokenAmount: "1000000",
+    saleType: "0",
+    projectSummary: "A short launch description buyers can inspect.",
+    softCap: "25000",
+    hardCap: "100000",
+    walletMin: "50",
+    walletMax: "2500",
+    liquidityPercent: "60",
+    website: "https://project.example",
+    docs: "https://docs.project.example",
+    xProfile: "https://x.com/project",
+    telegram: "https://t.me/project",
+    discord: "https://discord.gg/project",
+    campaignHashtag: "#AURonTopaz",
+    xHandle: "@AuroraLiquidity",
+    creatorNote: "A short project voice line for generated posts.",
+  },
+  testnetLaunchTx: {
+    status: "",
+    hash: "",
+    launchAddress: "",
+    error: "",
+  },
 };
 
 const statusMeta = {
@@ -615,9 +642,15 @@ const contractSelectors = {
   status: "0x200d2ed2",
   totalRaised: "0xc5c4744c",
   previewAccounting: "0x6ebd5c67",
+  createLaunch: "0x9853ac9d",
+  erc20Approve: "0x095ea7b3",
+  fundSaleTokens: "0x163fef89",
+  approveLaunch: "0x28b9b4fb",
+  openLaunch: "0x5d23e07d",
 };
 
 const launchStatusLabels = ["Draft", "Pending Review", "Approved", "Upcoming", "Live", "Finalized", "Refunding", "Cancelled"];
+const launchCreatedTopic = "0x32ff3eb3c73f7308a7ef91e3ba79128db88ff8708afd5a04e393a305cc58fc98";
 
 const platformEconomics = {
   successFeeBps: 200,
@@ -738,8 +771,24 @@ function normalizeAddress(address) {
   return (address || "").toLowerCase();
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => (
+    {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[char]
+  ));
+}
+
 function addressMatches(actual, expected) {
   return normalizeAddress(actual) === normalizeAddress(expected);
+}
+
+function isEvmAddress(address) {
+  return /^0x[a-fA-F0-9]{40}$/.test(address || "");
 }
 
 function numericChainId(chainId) {
@@ -807,6 +856,49 @@ function encodeAddress(address) {
   return normalizeAddress(address).replace(/^0x/, "").padStart(64, "0");
 }
 
+function parseUnits(value, decimals = 18) {
+  const raw = String(value ?? "").trim().replace(/,/g, "");
+  if (!/^\d+(\.\d+)?$/.test(raw)) throw new Error("Enter a positive number.");
+  const [whole, fraction = ""] = raw.split(".");
+  if (fraction.length > decimals) throw new Error(`Use no more than ${decimals} decimal places.`);
+  return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt((fraction + "0".repeat(decimals)).slice(0, decimals) || "0");
+}
+
+function parseBasisPoints(percent) {
+  const raw = String(percent ?? "").trim().replace(/,/g, "");
+  if (!/^\d+(\.\d+)?$/.test(raw)) throw new Error("Enter a valid liquidity percent.");
+  const [whole, fraction = ""] = raw.split(".");
+  const padded = (fraction + "00").slice(0, 2);
+  const bps = Number(whole) * 100 + Number(padded);
+  if (!Number.isFinite(bps) || bps < 0 || bps > 10000) throw new Error("Liquidity percent must be between 0 and 100.");
+  return bps;
+}
+
+function encodeAbiAddress(address) {
+  if (!isEvmAddress(address)) throw new Error("Enter a valid EVM address.");
+  return encodeAddress(address);
+}
+
+function encodeAbiUint(value) {
+  return BigInt(value).toString(16).padStart(64, "0");
+}
+
+function saleTypeLabel(value) {
+  return ["Fair launch", "Fixed-price sale", "Liquidity bootstrap"][Number(value)] || "Fair launch";
+}
+
+function setupModeForSaleType(value) {
+  return Number(value) === 0 ? 0 : 1;
+}
+
+function explorerTxLink(hash) {
+  return `${bnbTestnet.explorer}/tx/${hash}`;
+}
+
+function explorerAddressLink(address) {
+  return `${bnbTestnet.explorer}/address/${address}`;
+}
+
 function decodeUint256(result, word = 0) {
   const clean = (result || "0x").replace(/^0x/, "");
   const start = word * 64;
@@ -862,6 +954,214 @@ async function ethCall(to, data) {
   const payload = await response.json();
   if (payload.error) throw new Error(payload.error.message || "BNB testnet RPC call failed.");
   return payload.result;
+}
+
+async function ensureTestnetWallet() {
+  if (!window.ethereum) throw new Error("Open the site in a browser with MetaMask or Rabby.");
+  await syncWalletState("eth_requestAccounts");
+  if (!isWalletOnBnbTestnet()) {
+    await switchToBnbTestnet();
+    await syncWalletState();
+  }
+  if (!state.connected || !state.walletAddress) throw new Error("Connect a wallet before sending a transaction.");
+  if (!isWalletOnBnbTestnet()) throw new Error("Switch the wallet to BNB testnet first.");
+}
+
+async function sendEvmTransaction(to, data) {
+  await ensureTestnetWallet();
+  return window.ethereum.request({
+    method: "eth_sendTransaction",
+    params: [{ from: state.walletAddress, to, data }],
+  });
+}
+
+function delay(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function waitForTransactionReceipt(hash, attempts = 24) {
+  for (let index = 0; index < attempts; index += 1) {
+    const receipt = await window.ethereum.request({
+      method: "eth_getTransactionReceipt",
+      params: [hash],
+    });
+    if (receipt) return receipt;
+    await delay(2500);
+  }
+  return null;
+}
+
+function receiptSucceeded(receipt) {
+  return normalizeAddress(receipt?.status) === "0x1";
+}
+
+function launchAddressFromReceipt(receipt) {
+  const log = receipt?.logs?.find(
+    (entry) =>
+      addressMatches(entry.address, bnbTestnet.contracts.launchFactory) &&
+      normalizeAddress(entry.topics?.[0]) === normalizeAddress(launchCreatedTopic),
+  );
+  const topic = log?.topics?.[1] || "";
+  return topic.length >= 42 ? `0x${topic.slice(-40)}` : "";
+}
+
+function buildCreateLaunchData() {
+  const form = state.wizardForm;
+  const saleType = Number(form.saleType || 0);
+  const setupMode = setupModeForSaleType(saleType);
+  const saleTokenAmount = parseUnits(form.saleTokenAmount);
+  const softCap = parseUnits(form.softCap);
+  const hardCap = parseUnits(form.hardCap);
+  const walletMin = parseUnits(form.walletMin);
+  const walletMax = parseUnits(form.walletMax);
+  const liquidityBps = parseBasisPoints(form.liquidityPercent);
+  const platformFeeBps = platformEconomics.successFeeBps;
+
+  const words = [
+    encodeAbiAddress(state.walletAddress),
+    encodeAbiAddress(form.saleToken),
+    encodeAbiAddress(bnbTestnet.contracts.mockUsdt),
+    encodeAbiUint(saleType),
+    encodeAbiUint(setupMode),
+    encodeAbiUint(saleTokenAmount),
+    encodeAbiUint(softCap),
+    encodeAbiUint(hardCap),
+    encodeAbiUint(walletMin),
+    encodeAbiUint(walletMax),
+    encodeAbiUint(0),
+    encodeAbiUint(0),
+    encodeAbiUint(liquidityBps),
+    encodeAbiUint(platformFeeBps),
+  ];
+
+  return `${contractSelectors.createLaunch}${words.join("")}`;
+}
+
+function testnetLaunchValidation() {
+  const errors = [];
+  const form = state.wizardForm;
+
+  if (!state.connected) errors.push("Connect the testnet owner wallet.");
+  if (state.connected && !isWalletOnBnbTestnet()) errors.push("Switch to BNB testnet.");
+  if (state.connected && !addressMatches(state.walletAddress, bnbTestnet.expectedOwner)) {
+    errors.push("This deployed LaunchFactory only lets the owner wallet create launches.");
+  }
+  if (!isEvmAddress(form.saleToken)) errors.push("Enter the deployed testnet sale token contract address.");
+
+  try {
+    const saleTokenAmount = parseUnits(form.saleTokenAmount);
+    const softCap = parseUnits(form.softCap);
+    const hardCap = parseUnits(form.hardCap);
+    const walletMin = parseUnits(form.walletMin);
+    const walletMax = parseUnits(form.walletMax);
+    parseBasisPoints(form.liquidityPercent);
+    if (saleTokenAmount <= 0n) errors.push("Sale token amount must be above zero.");
+    if (softCap <= 0n) errors.push("Soft cap must be above zero.");
+    if (hardCap < softCap) errors.push("Hard cap must be greater than or equal to soft cap.");
+    if (walletMin <= 0n || walletMax < walletMin) errors.push("Wallet max must be greater than or equal to wallet min.");
+  } catch (error) {
+    errors.push(error.message);
+  }
+
+  return [...new Set(errors)];
+}
+
+async function createTestnetLaunchDraft() {
+  const errors = testnetLaunchValidation();
+  if (errors.length) {
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: "Needs input", error: errors[0] };
+    renderApp();
+    showToast(errors[0]);
+    return;
+  }
+
+  try {
+    state.testnetLaunchTx = { status: "Waiting for wallet approval...", hash: "", launchAddress: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(bnbTestnet.contracts.launchFactory, buildCreateLaunchData());
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: "Submitted. Waiting for confirmation...", hash };
+    renderApp();
+
+    const receipt = await waitForTransactionReceipt(hash);
+    if (!receipt) {
+      state.testnetLaunchTx = { ...state.testnetLaunchTx, status: "Submitted. Refresh Testnet after it confirms." };
+      renderApp();
+      showToast("Create launch transaction submitted.");
+      return;
+    }
+    if (!receiptSucceeded(receipt)) throw new Error("Create launch transaction reverted.");
+
+    const launchAddress = launchAddressFromReceipt(receipt);
+    state.testnetLaunchTx = {
+      status: "Draft launch created on BNB testnet.",
+      hash,
+      launchAddress,
+      error: "",
+    };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("Draft launch created on BNB testnet.");
+  } catch (error) {
+    state.testnetLaunchTx = {
+      ...state.testnetLaunchTx,
+      status: "Transaction not completed",
+      error: error.message || "Create launch failed.",
+    };
+    renderApp();
+    showToast(state.testnetLaunchTx.error);
+  }
+}
+
+async function runTestnetLaunchAction(action) {
+  const launchAddress = state.testnetLaunchTx.launchAddress;
+  if (!isEvmAddress(launchAddress)) {
+    showToast("Create a testnet launch draft first.");
+    return;
+  }
+
+  const amount = parseUnits(state.wizardForm.saleTokenAmount);
+  const actions = {
+    approveSaleToken: {
+      label: "Sale token approval",
+      to: state.wizardForm.saleToken,
+      data: `${contractSelectors.erc20Approve}${encodeAbiAddress(launchAddress)}${encodeAbiUint(amount)}`,
+    },
+    fundSaleTokens: {
+      label: "Fund sale vault",
+      to: launchAddress,
+      data: `${contractSelectors.fundSaleTokens}${encodeAbiUint(amount)}`,
+    },
+    approveLaunch: {
+      label: "Approve launch",
+      to: bnbTestnet.contracts.launchFactory,
+      data: `${contractSelectors.approveLaunch}${encodeAbiAddress(launchAddress)}`,
+    },
+    openLaunch: {
+      label: "Open launch",
+      to: bnbTestnet.contracts.launchFactory,
+      data: `${contractSelectors.openLaunch}${encodeAbiAddress(launchAddress)}`,
+    },
+  };
+  const config = actions[action];
+  if (!config) return;
+
+  try {
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: `${config.label}: waiting for wallet approval...`, error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(config.to, config.data);
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: `${config.label}: submitted.`, hash };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error(`${config.label} transaction reverted.`);
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: `${config.label}: confirmed.`, hash, error: "" };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast(`${config.label} confirmed.`);
+  } catch (error) {
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: `${config.label}: not completed`, error: error.message || "Transaction failed." };
+    renderApp();
+    showToast(state.testnetLaunchTx.error);
+  }
 }
 
 async function readLaunchFactory() {
@@ -3065,12 +3365,15 @@ function renderCurrentView() {
   }
 }
 
-function renderWizardField([label, value, type = "text", options = []]) {
+function renderWizardField([label, value, type = "text", options = [], key = ""]) {
+  const fieldValue = key ? state.wizardForm[key] : value;
+  const binding = key ? ` data-wizard-field="${key}"` : "";
+
   if (type === "textarea") {
     return `
       <div class="form-field full">
         <label>${label}</label>
-        <textarea>${value}</textarea>
+        <textarea${binding}>${escapeHtml(fieldValue)}</textarea>
       </div>
     `;
   }
@@ -3079,13 +3382,13 @@ function renderWizardField([label, value, type = "text", options = []]) {
     return `
       <div class="form-field">
         <label>${label}</label>
-        <select aria-label="${label}">
+        <select${binding} aria-label="${label}">
           ${options
             .map((option) => {
               const optionValue = typeof option === "string" ? option : option.value;
               const optionLabel = typeof option === "string" ? option : option.label;
               const disabled = typeof option === "string" || !option.disabled ? "" : " disabled";
-              return `<option value="${optionValue}" ${optionValue === value ? "selected" : ""}${disabled}>${optionLabel}</option>`;
+              return `<option value="${escapeHtml(optionValue)}" ${String(optionValue) === String(fieldValue) ? "selected" : ""}${disabled}>${escapeHtml(optionLabel)}</option>`;
             })
             .join("")}
         </select>
@@ -3098,8 +3401,8 @@ function renderWizardField([label, value, type = "text", options = []]) {
       <div class="form-field full">
         <label>${label}</label>
         <div class="logo-upload-row">
-          <div class="token-logo-preview" aria-hidden="true">${value}</div>
-          <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+          <div class="token-logo-preview" aria-hidden="true">${escapeHtml(fieldValue)}</div>
+          <input${binding} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
         </div>
       </div>
     `;
@@ -3110,7 +3413,7 @@ function renderWizardField([label, value, type = "text", options = []]) {
   return `
     <div class="form-field">
       <label>${label}</label>
-      <input type="${inputType}" value="${value}"${readonly} />
+      <input${binding} type="${inputType}" value="${escapeHtml(fieldValue)}"${readonly} />
     </div>
   `;
 }
@@ -3125,6 +3428,61 @@ function renderWizardHelp(step) {
   `;
 }
 
+function renderTestnetLaunchWriter() {
+  const form = state.wizardForm;
+  const tx = state.testnetLaunchTx;
+  const errors = testnetLaunchValidation();
+  const launchAddress = tx.launchAddress;
+  const canRunVaultActions = isEvmAddress(launchAddress) && Number(form.saleType) === 0;
+  const status = tx.status || "Ready after all required fields are filled.";
+  const txLink = tx.hash ? `<a class="address-link" href="${explorerTxLink(tx.hash)}" target="_blank" rel="noreferrer">${shortAddress(tx.hash)}</a>` : "Not sent";
+  const launchLink = isEvmAddress(launchAddress)
+    ? `<a class="address-link" href="${explorerAddressUrl(launchAddress)}" target="_blank" rel="noreferrer">${shortAddress(launchAddress)}</a>`
+    : "Created after confirmation";
+
+  return `
+    <div class="testnet-writer">
+      <div class="panel-title">
+        <h3>BNB Testnet Transaction</h3>
+        <span class="micro">Admin MVP path</span>
+      </div>
+      <div class="assist-note">
+        <strong>What this sends</strong>
+        <span>This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches.</span>
+      </div>
+      <div class="review-list">
+        ${[
+          ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected"],
+          ["Required creator/admin", shortAddress(bnbTestnet.expectedOwner)],
+          ["Sale type", saleTypeLabel(form.saleType)],
+          ["Sale token", isEvmAddress(form.saleToken) ? shortAddress(form.saleToken) : "Enter deployed token address"],
+          ["Quote asset", `Mock USDT ${shortAddress(bnbTestnet.contracts.mockUsdt)}`],
+          ["Sale tokens", `${escapeHtml(form.saleTokenAmount)} tokens`],
+          ["Soft / hard cap", `${escapeHtml(form.softCap)} / ${escapeHtml(form.hardCap)} USDT`],
+          ["Wallet min / max", `${escapeHtml(form.walletMin)} / ${escapeHtml(form.walletMax)} USDT`],
+          ["Topaz liquidity", `${escapeHtml(form.liquidityPercent)}% of net raise`],
+          ["Platform success fee", platformEconomics.successFeeLabel],
+          ["Latest tx", txLink],
+          ["SaleVault", launchLink],
+        ]
+          .map(([label, value]) => `<div class="review-row"><span>${label}</span><strong>${value}</strong></div>`)
+          .join("")}
+      </div>
+      ${errors.length ? `<div class="form-error">${errors.map((error) => `<span>${escapeHtml(error)}</span>`).join("")}</div>` : ""}
+      ${tx.error ? `<div class="form-error"><span>${escapeHtml(tx.error)}</span></div>` : ""}
+      <div class="tx-status">${escapeHtml(status)}</div>
+      <div class="tx-actions">
+        <button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>Create Draft On Testnet</button>
+        <button class="button" type="button" data-action="approve-sale-token" ${canRunVaultActions ? "" : "disabled"}>Approve Sale Tokens</button>
+        <button class="button" type="button" data-action="fund-sale-tokens" ${canRunVaultActions ? "" : "disabled"}>Fund Vault</button>
+        <button class="button gold" type="button" data-action="approve-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Approve Launch</button>
+        <button class="button primary" type="button" data-action="open-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Open Launch</button>
+      </div>
+      ${Number(form.saleType) === 0 ? "" : '<p class="muted tx-footnote">Guided sale modes can be drafted on-chain, but buyer deposits for fixed-price and liquidity-bootstrap modes still need their adapter contracts.</p>'}
+    </div>
+  `;
+}
+
 function renderWizardContent() {
   const step = wizardSteps[state.wizardStep];
   if (step === "Review") {
@@ -3134,9 +3492,9 @@ function renderWizardContent() {
         ${[
           ["Token", "Fixed supply, no transfer tax"],
           ["Token logo", "Project image uploaded"],
-          ["Sale type", "Fair launch self-serve; other modes available with guided setup"],
-          ["Sale goals", "Creator sets soft cap, hard cap, and wallet limits"],
-          ["Liquidity goal", "Creator commits raise percentage and minimum locked LP"],
+          ["Sale type", `${saleTypeLabel(state.wizardForm.saleType)} (${setupModeForSaleType(state.wizardForm.saleType) === 0 ? "self-serve" : "guided setup"})`],
+          ["Sale goals", `${escapeHtml(state.wizardForm.softCap)} / ${escapeHtml(state.wizardForm.hardCap)} USDT`],
+          ["Liquidity goal", `${escapeHtml(state.wizardForm.liquidityPercent)}% of net raise to Topaz LP`],
           ["LP Lock", "ERC20 LP token minted directly to locker"],
           ["Vesting", "10% TGE, remainder over 9 months"],
           ["Incentives", "No-gauge fee split first, gauge incentives later"],
@@ -3148,33 +3506,38 @@ function renderWizardContent() {
           .map(([label, value]) => `<div class="review-row"><span>${label}</span><strong>${value}</strong></div>`)
           .join("")}
       </div>
+      ${renderTestnetLaunchWriter()}
     `;
   }
 
   const fields = {
     Token: [
-      ["Token name", "Aurora"],
-      ["Symbol", "AUR"],
+      ["Token name", "Aurora", "text", [], "tokenName"],
+      ["Symbol", "AUR", "text", [], "symbol"],
       ["Token logo", "AUR", "file"],
+      ["Sale token contract", "", "text", [], "saleToken"],
       ["Total supply", "100000000", "number"],
       ["Contract mode", "Standard fixed supply", "select", ["Standard fixed supply", "Existing verified token", "Review required"]],
-      ["Project summary", "A short launch description buyers can inspect.", "textarea"],
+      ["Project summary", "A short launch description buyers can inspect.", "textarea", [], "projectSummary"],
     ],
     Sale: [
       [
         "Sale type",
-        "Fair launch",
+        "0",
         "select",
         [
-          { value: "Fair launch", label: "Fair launch (self-serve MVP)" },
-          { value: "Fixed-price sale", label: "Fixed-price sale (guided setup)" },
-          { value: "Liquidity bootstrap", label: "Liquidity bootstrap (guided setup)" },
+          { value: "0", label: "Fair launch (self-serve MVP)" },
+          { value: "1", label: "Fixed-price sale (guided setup)" },
+          { value: "2", label: "Liquidity bootstrap (guided setup)" },
         ],
+        "saleType",
       ],
       ["Accepted asset", "USDT", "readonly"],
-      ["Soft cap chosen by creator", "25000", "number"],
-      ["Hard cap chosen by creator", "100000", "number"],
-      ["Wallet max chosen by creator", "2500", "number"],
+      ["Sale tokens for buyers", "1000000", "number", [], "saleTokenAmount"],
+      ["Soft cap chosen by creator", "25000", "number", [], "softCap"],
+      ["Hard cap chosen by creator", "100000", "number", [], "hardCap"],
+      ["Wallet minimum", "50", "number", [], "walletMin"],
+      ["Wallet max chosen by creator", "2500", "number", [], "walletMax"],
       ["Standard setup", "Fair launch self-serve", "readonly"],
       ["Guided setup", "Fixed-price and liquidity bootstrap", "readonly"],
       ["Suggested small-launch range", "$25,000 to $150,000", "readonly"],
@@ -3182,7 +3545,7 @@ function renderWizardContent() {
       ["If soft cap misses", "Refunds open automatically", "select", ["Refunds open automatically", "Admin-reviewed refunds"]],
     ],
     Liquidity: [
-      ["Raise routed to LP %", "60", "number"],
+      ["Raise routed to LP %", "60", "number", [], "liquidityPercent"],
       ["Minimum locked liquidity goal", "25000", "number"],
       ["Project tokens reserved for LP", "Match the creator's launch price", "readonly"],
       ["Quote asset", "USDT", "readonly"],
@@ -3205,21 +3568,21 @@ function renderWizardContent() {
       ["Gauge posture", "Optional later upgrade", "select", ["Optional later upgrade", "Request gauge review at launch"]],
     ],
     Links: [
-      ["Project website", "https://project.example", "url"],
-      ["Documentation", "https://docs.project.example", "url"],
+      ["Project website", "https://project.example", "url", [], "website"],
+      ["Documentation", "https://docs.project.example", "url", [], "docs"],
       ["Audit or review link", "Not available yet", "select", ["Not available yet", "Audit posted", "Review posted"]],
-      ["X profile", "https://x.com/project", "url"],
-      ["Telegram", "https://t.me/project", "url"],
-      ["Discord", "https://discord.gg/project", "url"],
+      ["X profile", "https://x.com/project", "url", [], "xProfile"],
+      ["Telegram", "https://t.me/project", "url", [], "telegram"],
+      ["Discord", "https://discord.gg/project", "url", [], "discord"],
     ],
     Social: [
       ["Enable creator share kit", "Enabled", "select", ["Enabled", "Disabled"]],
-      ["Campaign hashtag", "#AURonTopaz"],
-      ["X handle", "@AuroraLiquidity"],
-      ["Telegram link", "https://t.me/project"],
-      ["Discord link", "https://discord.gg/project"],
+      ["Campaign hashtag", "#AURonTopaz", "text", [], "campaignHashtag"],
+      ["X handle", "@AuroraLiquidity", "text", [], "xHandle"],
+      ["Telegram link", "https://t.me/project", "url", [], "telegram"],
+      ["Discord link", "https://discord.gg/project", "url", [], "discord"],
       ["Share cadence", "Soft cap, 50%, 75%, finalization", "select", ["Soft cap, 50%, 75%, finalization", "Soft cap and final 24 hours", "Proof, claims, liquidity updates", "Refund notices"]],
-      ["Creator note", "A short project voice line for generated posts.", "textarea"],
+      ["Creator note", "A short project voice line for generated posts.", "textarea", [], "creatorNote"],
     ],
   };
 
@@ -3231,6 +3594,14 @@ function renderWizardContent() {
         .join("")}
     </div>
   `;
+}
+
+function wizardPrimaryLabel() {
+  return state.wizardStep === wizardSteps.length - 1 ? "Create Draft On Testnet" : "Continue";
+}
+
+function wizardPrimaryDisabled() {
+  return state.wizardStep === wizardSteps.length - 1 && testnetLaunchValidation().length > 0;
 }
 
 function renderWizard() {
@@ -3265,8 +3636,8 @@ function renderWizard() {
         </div>
         <div class="drawer-actions">
           <button class="button" type="button" data-action="prev-step" ${state.wizardStep === 0 ? "disabled" : ""}>Back</button>
-          <button class="button primary" type="button" data-action="next-step">
-            ${state.wizardStep === wizardSteps.length - 1 ? "Submit for review" : "Continue"}
+          <button class="button primary" type="button" data-action="next-step" ${wizardPrimaryDisabled() ? "disabled" : ""}>
+            ${wizardPrimaryLabel()}
           </button>
         </div>
       </section>
@@ -3370,6 +3741,21 @@ async function handleClick(event) {
     case "switch-testnet":
       await switchToBnbTestnet();
       break;
+    case "create-testnet-launch":
+      await createTestnetLaunchDraft();
+      break;
+    case "approve-sale-token":
+      await runTestnetLaunchAction("approveSaleToken");
+      break;
+    case "fund-sale-tokens":
+      await runTestnetLaunchAction("fundSaleTokens");
+      break;
+    case "approve-testnet-launch":
+      await runTestnetLaunchAction("approveLaunch");
+      break;
+    case "open-testnet-launch":
+      await runTestnetLaunchAction("openLaunch");
+      break;
     case "contribute":
       if (!state.connected) {
         await connectWallet();
@@ -3417,10 +3803,7 @@ async function handleClick(event) {
         state.wizardStep += 1;
         renderApp();
       } else {
-        state.wizardOpen = false;
-        state.wizardStep = 0;
-        renderApp();
-        showToast("Launch application queued for review in prototype mode.");
+        await createTestnetLaunchDraft();
       }
       break;
     case "prev-step":
@@ -3440,10 +3823,19 @@ function handleInput(event) {
     state.contribution = event.target.value;
     renderApp();
   }
+
+  const wizardField = event.target.dataset.wizardField;
+  if (wizardField) {
+    state.wizardForm[wizardField] = event.target.value;
+    if (["saleToken", "saleTokenAmount", "saleType"].includes(wizardField)) {
+      state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
+    }
+  }
 }
 
 app.addEventListener("click", handleClick);
 app.addEventListener("input", handleInput);
+app.addEventListener("change", handleInput);
 renderApp();
 refreshTestnetData(true);
 
