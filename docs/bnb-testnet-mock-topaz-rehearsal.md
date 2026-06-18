@@ -50,9 +50,11 @@ This compiles, runs tests, and simulates deploying the mock Topaz layer. It does
 After the dry run looks right:
 
 ```powershell
-$env:DEPLOYER_PRIVATE_KEY="keep_this_private"
+$env:DEPLOYER_PRIVATE_KEY="0xkeep_this_private"
 powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployMocks -Broadcast
 ```
+
+Use the private key from the dedicated testnet wallet only. The helper prefers the `0x` prefix and will add it if you accidentally paste the key without it.
 
 Write down the deployed addresses for:
 

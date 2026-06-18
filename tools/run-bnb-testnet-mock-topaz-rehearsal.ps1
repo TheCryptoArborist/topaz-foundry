@@ -32,9 +32,29 @@ function Test-RequiredEnv {
     }
 }
 
+function Normalize-DeployerPrivateKey {
+    if ([string]::IsNullOrWhiteSpace($env:DEPLOYER_PRIVATE_KEY)) {
+        return
+    }
+
+    $key = $env:DEPLOYER_PRIVATE_KEY.Trim()
+    if ($key -match '^0x[0-9a-fA-F]+$') {
+        $env:DEPLOYER_PRIVATE_KEY = $key
+        return
+    }
+    if ($key -match '^[0-9a-fA-F]+$') {
+        $env:DEPLOYER_PRIVATE_KEY = "0x$key"
+        Write-Host "Normalized DEPLOYER_PRIVATE_KEY by adding the 0x prefix for Foundry."
+        return
+    }
+
+    throw "DEPLOYER_PRIVATE_KEY must be a hex private key. Do not include quotes inside the value or extra text."
+}
+
 function Set-DryRunDeployerPrivateKey {
     if ($Broadcast) {
         Test-RequiredEnv @("DEPLOYER_PRIVATE_KEY")
+        Normalize-DeployerPrivateKey
         return
     }
 
@@ -42,6 +62,7 @@ function Set-DryRunDeployerPrivateKey {
         $env:DEPLOYER_PRIVATE_KEY = $DryRunPrivateKey
         Write-Host "Dry run: using a public dummy deployer key. Do not use this key for broadcast."
     }
+    Normalize-DeployerPrivateKey
 }
 
 function Invoke-Forge {
