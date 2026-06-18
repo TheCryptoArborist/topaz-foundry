@@ -517,6 +517,11 @@ const state = {
     launchAddress: "",
     error: "",
   },
+  contributionTx: {
+    status: "",
+    hash: "",
+    error: "",
+  },
   testTokenTx: {
     status: "",
     hash: "",
@@ -659,6 +664,9 @@ const contractSelectors = {
   saleTokensFunded: "0x4ad01a45",
   createLaunch: "0x9853ac9d",
   erc20Approve: "0x095ea7b3",
+  erc20Allowance: "0xdd62ed3e",
+  erc20BalanceOf: "0x70a08231",
+  saleVaultDeposit: "0xb6b55f25",
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
@@ -1407,6 +1415,92 @@ async function runTestnetLaunchAction(action) {
     state.testnetLaunchTx = { ...state.testnetLaunchTx, status: `${config.label}: not completed`, error: error.message || "Transaction failed." };
     renderApp();
     showToast(state.testnetLaunchTx.error);
+  }
+}
+
+function contributionValidation(launch) {
+  if (launch.status !== "live") return { ok: false, message: "This launch is not accepting deposits." };
+  if (!launch.testnet?.vault) return { ok: false, message: "This demo launch is still preview-only." };
+  if (!state.contribution) return { ok: false, message: "Enter a contribution amount." };
+
+  let amount = 0;
+  try {
+    amount = Number(state.contribution);
+    parseUnits(state.contribution);
+  } catch (error) {
+    return { ok: false, message: error.message || "Enter a valid contribution amount." };
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter a contribution amount above 0." };
+  if (amount < launch.min) return { ok: false, message: `Minimum contribution is ${launch.min.toLocaleString()} ${quoteAsset(launch)}.` };
+  if (amount > launch.max) return { ok: false, message: `Maximum contribution is ${launch.max.toLocaleString()} ${quoteAsset(launch)}.` };
+  return { ok: true, message: `Ready to send a testnet contribution of ${amount.toLocaleString()} ${quoteAsset(launch)}.` };
+}
+
+async function readErc20Allowance(token, owner, spender) {
+  return decodeUint256(await ethCall(token, `${contractSelectors.erc20Allowance}${encodeAbiAddress(owner)}${encodeAbiAddress(spender)}`));
+}
+
+async function readErc20Balance(token, owner) {
+  return decodeUint256(await ethCall(token, `${contractSelectors.erc20BalanceOf}${encodeAbiAddress(owner)}`));
+}
+
+async function contributeToTestnetLaunch() {
+  const launch = currentLaunch();
+  const validation = contributionValidation(launch);
+  if (!validation.ok) {
+    state.contributionTx = { status: validation.message, hash: "", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  const vault = launch.testnet.vault;
+  const quoteToken = launch.testnet.quoteToken || bnbTestnet.contracts.mockUsdt;
+  const amount = parseUnits(state.contribution);
+
+  try {
+    await ensureTestnetWallet();
+
+    state.contributionTx = { status: "Checking mock USDT balance and allowance...", hash: "", error: "" };
+    renderApp();
+
+    const balance = await readErc20Balance(quoteToken, state.walletAddress);
+    if (balance < amount) {
+      throw new Error(`Your wallet does not have enough mock USDT for ${Number(state.contribution).toLocaleString()} USDT.`);
+    }
+
+    const allowance = await readErc20Allowance(quoteToken, state.walletAddress, vault);
+    if (allowance < amount) {
+      state.contributionTx = { status: "Approve mock USDT in your wallet first...", hash: "", error: "" };
+      renderApp();
+      const approvalHash = await sendEvmTransaction(
+        quoteToken,
+        `${contractSelectors.erc20Approve}${encodeAbiAddress(vault)}${encodeAbiUint(amount)}`,
+      );
+      state.contributionTx = { status: "Mock USDT approval submitted. Waiting for confirmation...", hash: approvalHash, error: "" };
+      renderApp();
+      const approvalReceipt = await waitForTransactionReceipt(approvalHash);
+      if (approvalReceipt && !receiptSucceeded(approvalReceipt)) throw new Error("Mock USDT approval reverted.");
+    }
+
+    state.contributionTx = { status: "Send contribution deposit in your wallet...", hash: "", error: "" };
+    renderApp();
+    const depositHash = await sendEvmTransaction(vault, `${contractSelectors.saleVaultDeposit}${encodeAbiUint(amount)}`);
+    state.contributionTx = { status: "Contribution submitted. Waiting for confirmation...", hash: depositHash, error: "" };
+    renderApp();
+    const depositReceipt = await waitForTransactionReceipt(depositHash);
+    if (depositReceipt && !receiptSucceeded(depositReceipt)) throw new Error("Contribution deposit reverted.");
+
+    state.contributionTx = { status: `${Number(state.contribution).toLocaleString()} ${quoteAsset(launch)} contribution confirmed.`, hash: depositHash, error: "" };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("Contribution confirmed on BNB testnet.");
+  } catch (error) {
+    const message = error.message || "Contribution was not completed.";
+    state.contributionTx = { ...state.contributionTx, status: "Contribution not completed.", error: message };
+    renderApp();
+    showToast(message);
   }
 }
 
@@ -2279,6 +2373,7 @@ function testnetLaunchesForLaunchpad() {
       testnet: {
         vault,
         token,
+        quoteToken: config.quoteToken || bnbTestnet.contracts.mockUsdt,
         index: launch.index,
         saleTokensFunded: launch.saleTokensFunded,
       },
@@ -2790,6 +2885,16 @@ function estimatedTokens(launch) {
   return "Pro rata";
 }
 
+function renderContributionNote(launch) {
+  if (!state.contribution) return "";
+  const validation = contributionValidation(launch);
+  return `
+    <div class="success-note show ${validation.ok ? "" : "warn"}">
+      ${escapeHtml(validation.message)}
+    </div>
+  `;
+}
+
 function renderContribute(launch) {
   const action = primaryActionFor(launch);
   const disabled = launch.status !== "live";
@@ -2824,7 +2929,7 @@ function renderContribute(launch) {
       <div class="input-wrap">
         <div class="field-label"><span>You pay</span><span>Balance: ${state.connected ? `84,120 ${asset}` : "--"}</span></div>
         <div class="amount-input">
-          <input data-input="contribution" type="number" min="0" step="1" value="${state.contribution}" placeholder="0.0" />
+          <input data-input="contribution" type="number" min="${launch.min}" max="${launch.max}" step="1" value="${state.contribution}" placeholder="0.0" />
           <select class="asset-select" aria-label="Pay asset">
             <option>${asset}</option>
           </select>
@@ -2852,8 +2957,10 @@ function renderContribute(launch) {
         <strong>Before you contribute</strong>
         <span>Confirm the soft cap, refund rule, vesting, and risk flags on this page.</span>
       </div>
-      <div class="success-note ${state.connected && state.contribution ? "show" : ""}">
-        Ready to submit a simulated contribution of ${Number(state.contribution || 0).toLocaleString()} ${asset}.
+      ${renderContributionNote(launch)}
+      <div class="success-note ${state.contributionTx.status || state.contributionTx.error ? "show" : ""} ${state.contributionTx.error ? "warn" : ""}">
+        ${escapeHtml(state.contributionTx.error || state.contributionTx.status)}
+        ${state.contributionTx.hash ? `<br><a href="${explorerTxLink(state.contributionTx.hash)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
       </div>
     </section>
   `;
@@ -4279,6 +4386,7 @@ async function handleClick(event) {
     const launch = currentLaunch();
     const balance = 84120;
     state.contribution = Math.min(launch.max, Math.round((balance * Number(quick)) / 100)).toString();
+    state.contributionTx = { status: "", hash: "", error: "" };
     renderApp();
     return;
   }
@@ -4328,7 +4436,7 @@ async function handleClick(event) {
       if (!state.connected) {
         await connectWallet();
       } else {
-        showToast("Contribution preview ready. No transaction was sent.");
+        await contributeToTestnetLaunch();
       }
       break;
     case "claim-refund":
@@ -4431,6 +4539,7 @@ async function handleTokenLogoChange(input) {
 async function handleInput(event) {
   if (event.target.dataset.input === "contribution") {
     state.contribution = event.target.value;
+    state.contributionTx = { status: "", hash: "", error: "" };
     renderApp();
   }
 
