@@ -1,6 +1,6 @@
 # Arbor Foundry MVP Technical Spec
 
-Last updated: June 17, 2026
+Last updated: June 18, 2026
 
 ## 1. Product Goal
 
@@ -470,12 +470,13 @@ Before BNB mainnet:
 1. Run the local BNB fork rehearsal from `docs/local-bnb-fork-rehearsal.md`.
 2. Deploy rehearsal-only mock Topaz contracts to BNB testnet using `contracts/script/DeployMockTopazV2.s.sol` if no matching Topaz V2 testnet deployment is available.
 3. Deploy Arbor Foundry contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
-4. Run one successful fair launch.
-5. Run one failed/refunding fair launch.
-6. Run one guided setup fixed-price launch as admin-assisted.
-7. Run one guided setup liquidity bootstrap as admin-assisted.
-8. Verify accounting and proof page output.
-9. Confirm Topaz routing on the intended environment or mocked equivalent.
+4. Verify deployed testnet wiring with `contracts/script/VerifyArborFoundryTestnet.s.sol`.
+5. Run one successful scripted fair launch with `contracts/script/RunFairLaunchRehearsal.s.sol`.
+6. Run one failed/refunding fair launch.
+7. Run one guided setup fixed-price launch as admin-assisted.
+8. Run one guided setup liquidity bootstrap as admin-assisted.
+9. Verify accounting and proof page output.
+10. Confirm Topaz routing on the intended environment or mocked equivalent.
 
 ## 11. Deployment Plan
 
@@ -487,7 +488,8 @@ Before BNB mainnet:
 - Add tests for sale vault and accounting. Status: Foundry tests added for refunds, successful finalization, 2% fee accounting, hard cap, wallet min/max, guided setup restrictions, double refund/claim/finalization rejection, LP fee split, vesting, and incentive escrow.
 - Add deployment-prep script and checklist. Status: started with dry-run script and required-value checklist.
 - Add local BNB fork rehearsal helper. Status: started with PowerShell helper and rehearsal guide.
-- Add BNB testnet mock Topaz rehearsal layer. Status: started with mock factory/router/pair/ERC20 contracts, deploy script, and guide.
+- Add BNB testnet mock Topaz rehearsal layer. Status: deployed on BNB testnet with mock factory/router/pair/ERC20 contracts and Arbor Foundry MVP contracts.
+- Add BNB testnet verification and fair-launch rehearsal scripts. Status: started with read-only wiring verification and one successful fair-launch path.
 
 ### Phase 2: Backend/Admin
 
@@ -548,5 +550,7 @@ The current frontend prototype already represents:
 - Deployment-prep script and checklist for local/testnet rehearsal.
 - Local BNB fork rehearsal helper for repeatable pre-testnet checks.
 - BNB testnet mock Topaz rehearsal layer for public testnet deployment practice.
+- Current BNB testnet deployment record in `docs/bnb-testnet-deployment-record.md`.
+- Read-only deployed-contract verification script and scripted fair-launch rehearsal path.
 
-The next engineering step is to run the BNB testnet mock Topaz rehearsal, then add an end-to-end scripted launch rehearsal for one success path and one refund path.
+The next engineering step is to run the scripted BNB testnet fair-launch rehearsal, add the matching refund rehearsal, then wire the frontend to read BNB testnet contract state.

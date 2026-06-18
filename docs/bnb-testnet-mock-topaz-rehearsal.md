@@ -4,6 +4,8 @@ This is the recommended public testnet rehearsal if Topaz V2 does not have match
 
 The goal is not to pretend the mocks are Topaz. The goal is to rehearse Arbor Foundry's deployment, configuration, and finalization flow on a public testnet before any mainnet work.
 
+Current deployed BNB testnet addresses are recorded in `docs/bnb-testnet-deployment-record.md`.
+
 ## What Gets Deployed
 
 Step 1 deploys rehearsal-only contracts:
@@ -89,6 +91,13 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-
 
 ## 5. Post-Deploy Checks
 
+If you are using the current deployed addresses, set the environment values from `docs/bnb-testnet-deployment-record.md`, then run:
+
+```powershell
+cd "C:\Users\peter\OneDrive\Documents\Topaz Dex\topaz-foundry-github"
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -VerifyArbor
+```
+
 Confirm:
 
 - `LaunchFactory.finalizer()` points to the deployed `TopazFinalizer`.
@@ -98,14 +107,32 @@ Confirm:
 - `TopazFinalizer.router()` points to the mock Topaz router.
 - If `ARBOR_OWNER` differs from the deployer, the owner wallet accepts ownership on each deployed Arbor Foundry contract.
 
-## 6. Rehearsal Success Criteria
+## 6. Scripted Fair-Launch Rehearsal
+
+After `-VerifyArbor` passes, run a dry rehearsal of one complete fair launch. This requires your local testnet private key because the deployed contracts are owner-gated. Keep that key only in your terminal.
+
+```powershell
+$env:DEPLOYER_PRIVATE_KEY="0xkeep_this_private"
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunFairLaunch
+```
+
+If the dry run looks right, broadcast it:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunFairLaunch -Broadcast
+```
+
+This deploys a rehearsal token, creates a Fair Launch, funds the sale, contributes mock USDT, finalizes through the mock Topaz router/factory, and registers the LP lock.
+
+## 7. Rehearsal Success Criteria
 
 The testnet rehearsal is considered useful when:
 
 - Mock Topaz deploys cleanly.
 - Arbor Foundry deploys cleanly against the mock addresses.
-- A test launch can be created with mock USDT as the quote token.
-- A successful test launch can finalize into the mock Topaz router/factory.
+- Deployed addresses pass `-VerifyArbor`.
+- A scripted test launch can be created with mock USDT as the quote token.
+- A successful scripted test launch can finalize into the mock Topaz router/factory.
 - A failed test launch can enter refunds with no platform success fee.
 
-After this, the next engineering step is to add a scripted end-to-end testnet launch rehearsal so the same flow can be repeated without manual contract calls.
+After this, the next engineering step is to add the matching scripted refund rehearsal and then wire the frontend to read these testnet contracts.

@@ -2,6 +2,8 @@ param(
     [string]$RpcUrl = "https://data-seed-prebsc-1-s1.binance.org:8545/",
     [switch]$DeployMocks,
     [switch]$DeployArbor,
+    [switch]$VerifyArbor,
+    [switch]$RunFairLaunch,
     [switch]$Broadcast
 )
 
@@ -65,6 +67,11 @@ function Set-DryRunDeployerPrivateKey {
     Normalize-DeployerPrivateKey
 }
 
+function Set-RequiredDeployerPrivateKey {
+    Test-RequiredEnv @("DEPLOYER_PRIVATE_KEY")
+    Normalize-DeployerPrivateKey
+}
+
 function Invoke-Forge {
     param([string[]]$Arguments)
 
@@ -123,6 +130,44 @@ try {
         Invoke-ForgeScript -Arguments @(
             "script",
             "script/DeployArborFoundryMvp.s.sol:DeployArborFoundryMvp",
+            "--rpc-url",
+            $RpcUrl
+        )
+    }
+
+    if ($VerifyArbor) {
+        Test-RequiredEnv @(
+            "LAUNCH_FACTORY",
+            "TOPAZ_FINALIZER",
+            "LP_LOCKER",
+            "VESTING_VAULT",
+            "INCENTIVE_ESCROW",
+            "ARBOR_OWNER",
+            "PLATFORM_TREASURY",
+            "USDT_QUOTE_TOKEN",
+            "TOPAZ_FACTORY",
+            "TOPAZ_ROUTER"
+        )
+        Invoke-Forge -Arguments @(
+            "script",
+            "script/VerifyArborFoundryTestnet.s.sol:VerifyArborFoundryTestnet",
+            "--rpc-url",
+            $RpcUrl
+        )
+    }
+
+    if ($RunFairLaunch) {
+        Set-RequiredDeployerPrivateKey
+        Test-RequiredEnv @(
+            "LAUNCH_FACTORY",
+            "TOPAZ_FINALIZER",
+            "LP_LOCKER",
+            "PLATFORM_TREASURY",
+            "USDT_QUOTE_TOKEN"
+        )
+        Invoke-ForgeScript -Arguments @(
+            "script",
+            "script/RunFairLaunchRehearsal.s.sol:RunFairLaunchRehearsal",
             "--rpc-url",
             $RpcUrl
         )
