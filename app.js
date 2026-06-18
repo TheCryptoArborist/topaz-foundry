@@ -487,6 +487,7 @@ const state = {
     tokenName: "Aurora",
     symbol: "AUR",
     saleToken: "",
+    totalSupply: "100000000",
     saleTokenAmount: "1000000",
     saleType: "0",
     projectSummary: "A short launch description buyers can inspect.",
@@ -508,6 +509,12 @@ const state = {
     status: "",
     hash: "",
     launchAddress: "",
+    error: "",
+  },
+  testTokenTx: {
+    status: "",
+    hash: "",
+    tokenAddress: "",
     error: "",
   },
 };
@@ -651,6 +658,7 @@ const contractSelectors = {
 
 const launchStatusLabels = ["Draft", "Pending Review", "Approved", "Upcoming", "Live", "Finalized", "Refunding", "Cancelled"];
 const launchCreatedTopic = "0x32ff3eb3c73f7308a7ef91e3ba79128db88ff8708afd5a04e393a305cc58fc98";
+const testnetMockErc20Bytecode = "0x604060a0815234620003cb5762000bb4803803806200001e81620003cf565b928339810160a082820312620003cb5781516001600160401b0390818111620003cb57826200004f918501620003f5565b906020928385015190828211620003cb576200006d918601620003f5565b91858501519160ff83168303620003cb5760608601516001600160a01b0381169690879003620003cb5760800151938251828111620002e9575f54906001948583811c93168015620003c0575b89841014620002ca578190601f938481116200036d575b50899084831160011462000309575f92620002fd575b50505f19600383901b1c191690851b175f555b8151928311620002e9578354918483811c93168015620002de575b88841014620002ca57828285941162000275575b508791831160011462000211575f9262000205575b50505f19600383901b1c191690821b1790555b6080528062000173575b835161072c9081620004888239608051816102ff0152f35b8215620001d7575f917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9184845260038252858420620001b582825462000465565b9055620001c58160025462000465565b6002558551908152a35f80806200015b565b835162461bcd60e51b81526004810183905260076024820152667a65726f20746f60c81b6044820152606490fd5b015190505f806200013e565b90849350601f19831691845f52885f20925f5b8a8282106200025e575050841162000245575b505050811b01905562000151565b01515f1960f88460031b161c191690555f808062000237565b838501518655889790950194938401930162000224565b90919250845f52875f208380860160051c8201928a8710620002c0575b91869588929594930160051c01915b828110620002b157505062000129565b5f8155869550879101620002a1565b9250819262000292565b634e487b7160e01b5f52602260045260245ffd5b92607f169262000115565b634e487b7160e01b5f52604160045260245ffd5b015190505f80620000e7565b90879350601f198316915f80528b5f20925f5b8d8282106200035657505084116200033d575b505050811b015f55620000fa565b01515f1960f88460031b161c191690555f80806200032f565b8385015186558b979095019493840193016200031c565b9091505f8052895f208480850160051c8201928c8610620003b6575b918991869594930160051c01915b828110620003a7575050620000d1565b5f815585945089910162000397565b9250819262000389565b92607f1692620000ba565b5f80fd5b6040519190601f01601f191682016001600160401b03811183821017620002e957604052565b919080601f84011215620003cb5782516001600160401b038111620002e9576020906200042b601f8201601f19168301620003cf565b92818452828287010111620003cb575f5b818110620004515750825f9394955001015290565b85810183015184820184015282016200043c565b919082018092116200047357565b634e487b7160e01b5f52601160045260245ffdfe6080604081815260049182361015610015575f80fd5b5f3560e01c90816306fdde031461048e57508063095ea7b31461042057806318160ddd1461040257806323b872dd14610323578063313ce567146102e657806340c10f191461026357806370a082311461022c57806395d89b411461010a578063a9059cbb146100da5763dd62ed3e1461008d575f80fd5b346100d657806003193601126100d6576020916100a86105ac565b6100b06105c2565b6001600160a01b039182165f908152928552838320911682528352819020549051908152f35b5f80fd5b50346100d657806003193601126100d6576020906101036100f96105ac565b602435903361063c565b5160018152f35b50346100d6575f3660031901126100d6578051905f60018054908160011c9060018316928315610222575b602093848410811461020f578388529081156101f3575060011461019d575b505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b0390f35b604190634e487b7160e01b5f525260245ffd5b60015f908152929350837fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf65b8385106101df57505050508301015f8080610154565b8054888601830152930192849082016101c9565b60ff1916878501525050151560051b84010190505f8080610154565b602289634e487b7160e01b5f525260245ffd5b91607f1691610135565b50346100d65760203660031901126100d6576020906001600160a01b036102516105ac565b165f5260038252805f20549051908152f35b50346100d657806003193601126100d6575f7fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60206102a06105ac565b6001600160a01b031693602435906102b98615156105f9565b858552600383528085206102ce83825461062f565b90556102dc8260025461062f565b60025551908152a3005b50346100d6575f3660031901126100d6576020905160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100d65760603660031901126100d65761033d6105ac565b906103466105c2565b6044359060018060a01b03841693845f52602094868652845f20335f528652845f20548481106103d35796610380856101039798996105d8565b825f52818952875f20335f528952875f2055815f528752855f20335f528752855f20549086519182527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925883393a361063c565b855162461bcd60e51b81528089018890526009602482015268616c6c6f77616e636560b81b6044820152606490fd5b50346100d6575f3660031901126100d6576020906002549051908152f35b50346100d657806003193601126100d65760209161043c6105ac565b9060243590335f528452825f209160018060a01b031691825f52845280835f205582519081527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925843392a35160018152f35b919050346100d6575f3660031901126100d6575f805460018160011c906001831692831561055b575b602093848410811461020f578388529081156101f3575060011461050757505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b5f808052929350837f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5635b83851061054757505050508301015f8080610154565b805488860183015293019284908201610531565b91607f16916104b7565b602080825282518183018190529093925f5b82811061059857505060409293505f838284010152601f8019910116010190565b818101860151848201604001528501610577565b600435906001600160a01b03821682036100d657565b602435906001600160a01b03821682036100d657565b919082039182116105e557565b634e487b7160e01b5f52601160045260245ffd5b1561060057565b60405162461bcd60e51b81526020600482015260076024820152667a65726f20746f60c81b6044820152606490fd5b919082018092116105e557565b6001600160a01b039182169291906106558415156105f9565b1690815f5260036020528060405f2054106106c75760207fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef91835f526003825260405f206106a48282546105d8565b9055845f526003825260405f206106bc82825461062f565b9055604051908152a3565b60405162461bcd60e51b815260206004820152600760248201526662616c616e636560c81b6044820152606490fdfea264697066735822122050b11ecab6a4dc65b9df69cc3425166f94b6a3d865ab647a201facedb939a73364736f6c63430008180033";
 
 const platformEconomics = {
   successFeeBps: 200,
@@ -883,6 +891,22 @@ function encodeAbiUint(value) {
   return BigInt(value).toString(16).padStart(64, "0");
 }
 
+function stringToHex(value) {
+  return Array.from(new TextEncoder().encode(String(value ?? "")))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function padHexRight(hex) {
+  const remainder = hex.length % 64;
+  return remainder === 0 ? hex : `${hex}${"0".repeat(64 - remainder)}`;
+}
+
+function encodeAbiString(value) {
+  const hex = stringToHex(value);
+  return `${encodeAbiUint(hex.length / 2)}${padHexRight(hex)}`;
+}
+
 function saleTypeLabel(value) {
   return ["Fair launch", "Fixed-price sale", "Liquidity bootstrap"][Number(value)] || "Fair launch";
 }
@@ -969,10 +993,76 @@ async function ensureTestnetWallet() {
 
 async function sendEvmTransaction(to, data) {
   await ensureTestnetWallet();
+  const tx = { from: state.walletAddress, data };
+  if (to) tx.to = to;
   return window.ethereum.request({
     method: "eth_sendTransaction",
-    params: [{ from: state.walletAddress, to, data }],
+    params: [tx],
   });
+}
+
+function buildTestTokenDeployData() {
+  const form = state.wizardForm;
+  const name = form.tokenName.trim();
+  const symbol = form.symbol.trim();
+  if (!name) throw new Error("Enter a token name.");
+  if (!symbol) throw new Error("Enter a token symbol.");
+
+  const supply = parseUnits(form.totalSupply);
+  if (supply <= 0n) throw new Error("Total supply must be above zero.");
+
+  const nameTail = encodeAbiString(name);
+  const symbolTail = encodeAbiString(symbol);
+  const headBytes = 5 * 32;
+  const symbolOffset = headBytes + nameTail.length / 2;
+  const constructorArgs = [
+    encodeAbiUint(headBytes),
+    encodeAbiUint(symbolOffset),
+    encodeAbiUint(18),
+    encodeAbiAddress(state.walletAddress),
+    encodeAbiUint(supply),
+  ].join("");
+
+  return `${testnetMockErc20Bytecode}${constructorArgs}${nameTail}${symbolTail}`;
+}
+
+async function deployTestSaleToken() {
+  try {
+    state.testTokenTx = { status: "Waiting for wallet approval...", hash: "", tokenAddress: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction("", buildTestTokenDeployData());
+    state.testTokenTx = { ...state.testTokenTx, status: "Submitted. Waiting for token address...", hash };
+    renderApp();
+
+    const receipt = await waitForTransactionReceipt(hash);
+    if (!receipt) {
+      state.testTokenTx = { ...state.testTokenTx, status: "Submitted. Refresh after it confirms." };
+      renderApp();
+      showToast("Test token deployment submitted.");
+      return;
+    }
+    if (!receiptSucceeded(receipt)) throw new Error("Test token deployment reverted.");
+    if (!isEvmAddress(receipt.contractAddress)) throw new Error("Token deployed, but no contract address was returned yet.");
+
+    state.wizardForm.saleToken = receipt.contractAddress;
+    state.testTokenTx = {
+      status: "Test token deployed and filled in.",
+      hash,
+      tokenAddress: receipt.contractAddress,
+      error: "",
+    };
+    state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
+    renderApp();
+    showToast("Test token address filled in.");
+  } catch (error) {
+    state.testTokenTx = {
+      ...state.testTokenTx,
+      status: "Token deployment not completed",
+      error: error.message || "Token deployment failed.",
+    };
+    renderApp();
+    showToast(state.testTokenTx.error);
+  }
 }
 
 function delay(ms) {
@@ -3411,6 +3501,28 @@ function renderWizardField([label, value, type = "text", options = [], key = ""]
     `;
   }
 
+  if (key === "saleToken") {
+    const tokenTx = state.testTokenTx;
+    const tokenAddress = tokenTx.tokenAddress || fieldValue;
+    const tokenLink = isEvmAddress(tokenAddress)
+      ? `<a class="address-link" href="${explorerAddressUrl(tokenAddress)}" target="_blank" rel="noreferrer">${shortAddress(tokenAddress)}</a>`
+      : "No token deployed yet";
+    return `
+      <div class="form-field">
+        <label>${label}</label>
+        <div class="contract-input-row">
+          <input${binding} type="text" value="${escapeHtml(fieldValue)}" placeholder="Deploy or paste a BNB testnet ERC20 address" />
+          <button class="button gold" type="button" data-action="deploy-test-token">Deploy Test Token</button>
+        </div>
+        <div class="inline-status">
+          <span>${escapeHtml(tokenTx.status || "Deploy a test token to generate this address.")}</span>
+          <strong>${tokenLink}</strong>
+        </div>
+        ${tokenTx.error ? `<div class="form-error"><span>${escapeHtml(tokenTx.error)}</span></div>` : ""}
+      </div>
+    `;
+  }
+
   const readonly = type === "readonly" ? " readonly" : "";
   const inputType = type === "number" ? "number" : type === "url" ? "url" : "text";
   return `
@@ -3552,7 +3664,7 @@ function renderWizardContent() {
       ["Symbol", "AUR", "text", [], "symbol"],
       ["Token logo", "AUR", "file"],
       ["Sale token contract", "", "text", [], "saleToken"],
-      ["Total supply", "100000000", "number"],
+      ["Total supply", "100000000", "number", [], "totalSupply"],
       ["Contract mode", "Standard fixed supply", "select", ["Standard fixed supply", "Existing verified token", "Review required"]],
       ["Project summary", "A short launch description buyers can inspect.", "textarea", [], "projectSummary"],
     ],
@@ -3777,6 +3889,9 @@ async function handleClick(event) {
     case "switch-testnet":
       await switchToBnbTestnet();
       break;
+    case "deploy-test-token":
+      await deployTestSaleToken();
+      break;
     case "create-testnet-launch":
       await createTestnetLaunchDraft();
       break;
@@ -3865,6 +3980,9 @@ function handleInput(event) {
     state.wizardForm[wizardField] = event.target.value;
     if (["saleToken", "saleTokenAmount", "saleType"].includes(wizardField)) {
       state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
+    }
+    if (["tokenName", "symbol", "totalSupply"].includes(wizardField)) {
+      state.testTokenTx = { status: "", hash: "", tokenAddress: "", error: "" };
     }
   }
 }

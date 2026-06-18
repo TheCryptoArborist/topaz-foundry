@@ -1548,6 +1548,38 @@ h3 {
   padding-top: 10px;
 }
 
+.contract-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.contract-input-row .button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.inline-status {
+  display: grid;
+  gap: 4px;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.inline-status span {
+  color: var(--text-soft);
+}
+
+.inline-status strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .logo-upload-row {
   display: grid;
   grid-template-columns: 58px minmax(0, 1fr);
@@ -1927,6 +1959,7 @@ h3 {
   .form-grid,
   .wizard-help,
   .wizard-steps,
+  .contract-input-row,
   .tx-actions {
     grid-template-columns: 1fr;
   }

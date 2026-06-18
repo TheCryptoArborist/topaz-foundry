@@ -34,7 +34,7 @@ The prototype shows:
 - Buyer portfolio, refund, rewards, LP-lock registry, project review, and admin readiness screens.
 - Read-only BNB testnet screen with wallet detection, chain 97 status, deployed contract addresses, launch count, wiring checks, and recent sale vault status reads.
 - Create-launch drawer where project creators add a token logo and set controlled raise, liquidity, vesting, incentive, links, social, and review details. Fair Launch is the self-serve MVP path; fixed-price sale and liquidity bootstrap are available with guided review/setup.
-- BNB testnet write path in the Create Launch review step for the owner/admin wallet: create a Draft SaleVault through the deployed LaunchFactory, approve sale tokens, fund the vault, approve the launch, and open a fair-launch vault.
+- BNB testnet write path in the Create Launch flow for the owner/admin wallet: deploy a simple test ERC20 token, create a Draft SaleVault through the deployed LaunchFactory, approve sale tokens, fund the vault, approve the launch, and open a fair-launch vault.
 - Optional creator share kit with generated X/Telegram/Discord progress updates, campaign tags, and launch-link copying for each token raise.
 - Approval gate: new launches move Draft -> Pending Review -> Approved before they can be scheduled or go live.
 - Soft-cap outcome rules: launches that meet soft cap finalize from the actual raise, while launches below soft cap move to refunds with 0% platform fee, no Topaz pool, no LP lock, and no buyer claims.
@@ -43,4 +43,4 @@ The prototype shows:
 - Admin/private accounting for total raised, expected and collected success fees, failed launches at $0 fee, liquidity committed, LP fee split status, approval queue, finalization tasks, and refund tasks.
 - Custom Arbor Foundry tree logo in `assets/arbor-foundry-logo.jpeg`.
 
-The frontend now includes an owner/admin-only BNB testnet write path for fair-launch rehearsals. It is not public self-serve mainnet software yet: fixed-price and liquidity-bootstrap deposits still need adapter contracts, and the project still needs backend/indexer work, expanded edge-case tests, and security review before handling mainnet user funds.
+The frontend now includes an owner/admin-only BNB testnet write path for fair-launch rehearsals, including a simple test-token deployment helper. It is not public self-serve mainnet software yet: fixed-price and liquidity-bootstrap deposits still need adapter contracts, and the project still needs backend/indexer work, expanded edge-case tests, and security review before handling mainnet user funds.
