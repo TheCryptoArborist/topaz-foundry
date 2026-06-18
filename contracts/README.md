@@ -37,6 +37,7 @@ First-pass tests cover:
 - Wallet min/max enforcement.
 - Guided setup sale modes blocked from the self-serve deposit path.
 - Double-finalization rejection.
+- Quote-token allowlist enforcement for USDT-first MVP policy.
 - 80/20 non-gauged LP fee split.
 - Incentive escrow overfunding protection and release.
 - Basic vesting claim release.

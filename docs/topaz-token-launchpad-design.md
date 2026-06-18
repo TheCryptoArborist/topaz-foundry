@@ -215,7 +215,7 @@ Default launch settings:
 - Chain: BNB Chain mainnet, chain id `56`.
 - Pool type: Topaz V2 volatile pool.
 - Stable flag: `stable = false`.
-- Quote asset: `WBNB` or `USDT`.
+- Quote asset: `USDT` for the self-serve MVP. `WBNB` can be handled later as a guided/admin exception.
 - LP asset: fungible ERC20 LP token, where the pool address is also the LP token address.
 - First fee path: non-gauged V2 LP fees claimed by the launchpad locker with `pool.claimFees()`.
 
@@ -626,7 +626,7 @@ After MVP:
 
 These need answers before contracts are written:
 
-- Which quote assets should be allowed first: WBNB, USDT, or both?
+- Quote asset policy is selected: USDT first for self-serve MVP; WBNB later only as guided/admin setup.
 - Should the launchpad deploy tokens, accept existing tokens, or support both?
 - Should LP locking be permanent by default or time-locked by default?
 - Should launch incentives be required for every launch?

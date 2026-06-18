@@ -183,6 +183,51 @@ contract ArborFoundryMvpTest {
         _assertEq(SaleVault(context.launch).totalRaised(), 0);
     }
 
+    function testQuoteTokenAllowlistBlocksUnapprovedQuoteAssets() external {
+        TestContext memory context = _createLaunchContext(500 ether, 1000 ether, 10_000 ether, 6000);
+        LaunchFactory factory = new LaunchFactory(address(this), context.platformTreasury);
+        factory.setQuoteTokenAllowlistEnabled(true);
+        factory.setQuoteTokenAllowed(address(context.quoteToken), true);
+
+        address allowedLaunch = factory.createLaunch(
+            _launchConfig({
+                saleToken: address(context.saleToken),
+                quoteToken: address(context.quoteToken),
+                softCap: 500 ether,
+                hardCap: 1000 ether,
+                saleTokenAmount: 10_000 ether,
+                liquidityBps: 6000,
+                walletMin: 1 ether,
+                walletMax: 1000 ether,
+                saleType: ArborFoundryTypes.SaleType.FairLaunch,
+                setupMode: ArborFoundryTypes.SetupMode.SelfServe
+            })
+        );
+
+        _assertTrue(allowedLaunch != address(0));
+
+        MockERC20 wbnbLikeToken = new MockERC20("WBNB Like", "WBNB", 18);
+        (bool blocked,) = address(factory)
+            .call(
+                abi.encodeCall(
+                    LaunchFactory.createLaunch,
+                    (_launchConfig({
+                        saleToken: address(context.saleToken),
+                        quoteToken: address(wbnbLikeToken),
+                        softCap: 500 ether,
+                        hardCap: 1000 ether,
+                        saleTokenAmount: 10_000 ether,
+                        liquidityBps: 6000,
+                        walletMin: 1 ether,
+                        walletMax: 1000 ether,
+                        saleType: ArborFoundryTypes.SaleType.FairLaunch,
+                        setupMode: ArborFoundryTypes.SetupMode.SelfServe
+                    }))
+                )
+            );
+        _assertFalse(blocked);
+    }
+
     function testDoubleFinalizationIsRejected() external {
         TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
         TopazFinalizer finalizer = _attachFinalizer(context);
@@ -341,10 +386,39 @@ contract ArborFoundryMvpTest {
         context.saleToken.mint(address(this), 20_000 ether);
         context.quoteToken.mint(address(this), 20_000 ether);
 
-        ArborFoundryTypes.LaunchConfig memory config = ArborFoundryTypes.LaunchConfig({
+        context.launch = context.factory
+            .createLaunch(
+                _launchConfig({
+                    saleToken: address(context.saleToken),
+                    quoteToken: address(context.quoteToken),
+                    softCap: softCap,
+                    hardCap: hardCap,
+                    saleTokenAmount: saleTokenAmount,
+                    liquidityBps: liquidityBps,
+                    walletMin: walletMin,
+                    walletMax: walletMax,
+                    saleType: saleType,
+                    setupMode: setupMode
+                })
+            );
+    }
+
+    function _launchConfig(
+        address saleToken,
+        address quoteToken,
+        uint256 softCap,
+        uint256 hardCap,
+        uint256 saleTokenAmount,
+        uint16 liquidityBps,
+        uint256 walletMin,
+        uint256 walletMax,
+        ArborFoundryTypes.SaleType saleType,
+        ArborFoundryTypes.SetupMode setupMode
+    ) internal view returns (ArborFoundryTypes.LaunchConfig memory config) {
+        config = ArborFoundryTypes.LaunchConfig({
             creator: address(this),
-            saleToken: address(context.saleToken),
-            quoteToken: address(context.quoteToken),
+            saleToken: saleToken,
+            quoteToken: quoteToken,
             saleType: saleType,
             setupMode: setupMode,
             saleTokenAmount: saleTokenAmount,
@@ -357,8 +431,6 @@ contract ArborFoundryMvpTest {
             liquidityBps: liquidityBps,
             platformFeeBps: 200
         });
-
-        context.launch = context.factory.createLaunch(config);
     }
 
     function _attachFinalizer(TestContext memory context) internal returns (TopazFinalizer finalizer) {

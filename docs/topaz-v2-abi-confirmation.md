@@ -83,7 +83,7 @@ This supports the MVP assumption that Topaz V2 volatile pools are fungible ERC20
 
 ## Remaining Before Testnet
 
-- Confirm exact quote asset list for MVP: WBNB, USDT, or both.
+- Quote asset policy selected: USDT only for self-serve Fair Launch MVP. WBNB remains a later guided/admin exception.
 - Decide whether finalization should call `quoteAddLiquidity` before `addLiquidity`, or rely on an off-chain/admin quote with explicit min amounts.
 - Keep gauge/bribe automation manual until Topaz voter/reward interfaces are checked separately.
 

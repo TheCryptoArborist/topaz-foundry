@@ -80,6 +80,7 @@ Responsibilities:
 - Store approved launch template/type.
 - Store creator address.
 - Store quote asset.
+- Enforce quote-token allowlist for self-serve MVP launches.
 - Store launch status.
 - Store platform fee BPS.
 - Store internal fee recipient address.
@@ -232,7 +233,7 @@ MVP Topaz assumptions:
 - BNB Chain mainnet, chain ID `56`.
 - Topaz V2 volatile pool.
 - `stable=false`.
-- Quote assets: USDT and/or WBNB, final list still needs confirmation.
+- Quote asset policy: USDT only for self-serve Fair Launch MVP. WBNB can be a later guided/admin exception after extra review.
 - Launch tokens should be standard ERC20 fixed-supply or verified existing tokens.
 - Fee-on-transfer/tax tokens should be blocked in MVP unless tested end to end.
 
@@ -289,7 +290,7 @@ Suggested tables:
 | sale_type | enum | fair_launch, fixed_price, liquidity_bootstrap |
 | setup_mode | enum | self_serve, guided_setup |
 | status | enum | draft, pending_review, approved, upcoming, live, finalized, refunding |
-| quote_asset | address/string | USDT/WBNB |
+| quote_asset | address/string | USDT for self-serve MVP; WBNB only as later guided/admin exception |
 | soft_cap | decimal | Minimum success |
 | hard_cap | decimal | Maximum raise |
 | wallet_min | decimal | Buyer minimum |
@@ -512,7 +513,7 @@ Before BNB mainnet:
 
 ## 12. Open Decisions
 
-- Confirm first quote assets: USDT only, WBNB only, or both.
+- Quote asset policy is selected: USDT only for self-serve Fair Launch MVP; WBNB remains a later guided/admin exception.
 - Reconfirm Topaz V2 ABI details immediately before deployment; MVP router/factory/pool functions are currently matched in `docs/topaz-v2-abi-confirmation.md`.
 - Decide whether Arbor Foundry deploys project tokens or only accepts existing verified tokens.
 - Decide LP lock default: 12 months, 24 months, or permanent fee-split.
@@ -537,7 +538,7 @@ The current frontend prototype already represents:
 - Verify This Launch trust page.
 - Admin/private accounting concept.
 - Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
-- Foundry test suite for refund, finalization accounting, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
+- Foundry test suite for refund, finalization accounting, quote-token allowlist enforcement, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
 - Local BNB Chain fork dry run against the live Topaz V2 router/factory passed for pool creation, liquidity add, and LP minting.
 
 The next engineering step is to choose the MVP quote asset policy and prepare testnet deployment scripts, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.

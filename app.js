@@ -138,12 +138,12 @@ const launches = [
     goal: 45000,
     softCap: 25000,
     saleType: "Fixed price",
-    quoteAsset: "WBNB",
-    price: "1 NXO = 0.000018 WBNB",
-    hardCap: "45,000 USDT equivalent",
+    quoteAsset: "USDT",
+    price: "1 NXO = 0.012 USDT",
+    hardCap: "45,000 USDT",
     endsIn: "Starts in 1d 14h",
     summary:
-      "Nexora is preparing a WBNB-paired launch with mandatory V2 LP token lock, team vesting, and a later gauge-upgrade path.",
+      "Nexora is preparing a guided fixed-price launch with mandatory V2 LP token lock, team vesting, and a later gauge-upgrade path.",
     tags: ["AI", "Index", "Research"],
     min: 0.03,
     max: 2.5,
@@ -650,7 +650,7 @@ const lpLocks = [
     status: "Locked",
   },
   {
-    pair: "NXO/WBNB",
+    pair: "NXO/USDT",
     tokenId: "Queued pool",
     value: "Pending",
     duration: "Permanent",
@@ -663,7 +663,7 @@ const lpLocks = [
 const incentiveRows = [
   ["AUR/USDT", "18,000 veTOPAZ", "Epoch 1-4", "Funded", "High"],
   ["DWR/USDT", "8,500 veTOPAZ", "Epoch 1-3", "Funded", "Medium"],
-  ["NXO/WBNB", "7,500 veTOPAZ", "Queued", "Pending finalization", "High"],
+  ["NXO/USDT", "7,500 veTOPAZ", "Queued", "Pending finalization", "High"],
   ["NMB/USDT", "10,000 veTOPAZ", "Queued", "Pending review", "Medium"],
 ];
 
@@ -1739,7 +1739,6 @@ function renderContribute(launch) {
           <input data-input="contribution" type="number" min="0" step="1" value="${state.contribution}" placeholder="0.0" />
           <select class="asset-select" aria-label="Pay asset">
             <option>${asset}</option>
-            <option>${asset === "USDT" ? "WBNB" : "USDT"}</option>
           </select>
         </div>
         <div class="quick-grid">
@@ -1992,7 +1991,7 @@ function renderPortfolioView() {
         '<button class="button primary" type="button" data-action="connect-wallet">' + icons.wallet + (state.connected ? " Wallet Connected" : " Connect Wallet") + "</button>",
       )}
       ${renderKpiGrid([
-        ["Deposited", "2,730 quote units", "USDT/WBNB launches"],
+        ["Deposited", "2,730 USDT", "Self-serve launches"],
         ["Claimable", "18,420 SLC", "Finalized launch"],
         ["Refundable", "880 USDT", "Soft-cap failure"],
         ["Pending", "266,666.67 AUR", "Live allocation preview"],
@@ -2137,7 +2136,7 @@ function renderIntegrationView() {
   ];
   const flowRows = [
     ["1", "Bonding completes", "Project token and quote asset are in the sale vault."],
-    ["2", "Choose quote", "Use WBNB or USDT for normal launches."],
+    ["2", "Choose quote", "Use USDT for self-serve MVP launches."],
     ["3", "Use stable=false", "New launch tokens use volatile constant-product pools."],
     ["4", "Quote liquidity", "Call quoteAddLiquidity with the factory address and apply nonzero slippage mins."],
     ["5", "Mint LP to locker", "Call addLiquidity with the locker as recipient."],
@@ -2171,7 +2170,7 @@ function renderIntegrationView() {
             <span class="micro">First version</span>
           </div>
           <div class="review-list">
-            <div class="review-row"><span>Quote asset</span><strong>WBNB or USDT</strong></div>
+            <div class="review-row"><span>Quote asset</span><strong>USDT self-serve MVP</strong></div>
             <div class="review-row"><span>Pool flag</span><strong>stable=false</strong></div>
             <div class="review-row"><span>Slippage mins</span><strong>Required, never 0</strong></div>
             <div class="review-row"><span>LP recipient</span><strong>Fee-split locker</strong></div>
@@ -2412,7 +2411,7 @@ function renderRewardsView() {
           [
             ["Aurora launch budget", "AUR/USDT", "18,000 veTOPAZ", "Active"],
             ["Defiware launch budget", "DWR/USDT", "8,500 veTOPAZ", "Active"],
-            ["Nexora escrow", "NXO/WBNB", "7,500 veTOPAZ", "Queued"],
+            ["Nexora escrow", "NXO/USDT", "7,500 veTOPAZ", "Queued"],
             ["Nimbus escrow", "NMB/USDT", "10,000 veTOPAZ", "Queued"],
           ],
         )}
@@ -2735,7 +2734,7 @@ function renderWizardContent() {
           { value: "Liquidity bootstrap", label: "Liquidity bootstrap (guided setup)" },
         ],
       ],
-      ["Accepted asset", "USDT", "select", ["USDT", "WBNB"]],
+      ["Accepted asset", "USDT", "readonly"],
       ["Soft cap chosen by creator", "25000", "number"],
       ["Hard cap chosen by creator", "100000", "number"],
       ["Wallet max chosen by creator", "2500", "number"],
@@ -2749,7 +2748,7 @@ function renderWizardContent() {
       ["Raise routed to LP %", "60", "number"],
       ["Minimum locked liquidity goal", "25000", "number"],
       ["Project tokens reserved for LP", "Match the creator's launch price", "readonly"],
-      ["Quote asset", "USDT", "select", ["USDT", "WBNB"]],
+      ["Quote asset", "USDT", "readonly"],
       ["Topaz pool type", "V2 volatile, stable=false", "readonly"],
       ["Slippage minimum %", "1", "number"],
       ["Lock duration", "Permanent fee-split lock", "select", ["12 months", "24 months", "Permanent fee-split lock"]],

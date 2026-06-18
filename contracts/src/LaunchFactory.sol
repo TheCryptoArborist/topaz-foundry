@@ -13,13 +13,18 @@ contract LaunchFactory is ArborOwnable {
 
     address[] public allLaunches;
     mapping(address => bool) public isLaunch;
+    mapping(address => bool) public quoteTokenAllowed;
+    bool public quoteTokenAllowlistEnabled;
 
     event LaunchCreated(address indexed launch, address indexed creator, ArborFoundryTypes.SaleType saleType);
     event PlatformTreasurySet(address indexed treasury);
     event FinalizerSet(address indexed finalizer);
+    event QuoteTokenAllowlistSet(bool enabled);
+    event QuoteTokenSet(address indexed quoteToken, bool allowed);
 
     error InvalidConfig();
     error UnknownLaunch();
+    error QuoteTokenNotAllowed();
 
     constructor(address owner_, address platformTreasury_) ArborOwnable(owner_) {
         if (platformTreasury_ == address(0)) revert InvalidConfig();
@@ -37,6 +42,17 @@ contract LaunchFactory is ArborOwnable {
         if (finalizer_ == address(0)) revert InvalidConfig();
         finalizer = finalizer_;
         emit FinalizerSet(finalizer_);
+    }
+
+    function setQuoteTokenAllowlistEnabled(bool enabled) external onlyOwner {
+        quoteTokenAllowlistEnabled = enabled;
+        emit QuoteTokenAllowlistSet(enabled);
+    }
+
+    function setQuoteTokenAllowed(address quoteToken, bool allowed) external onlyOwner {
+        if (quoteToken == address(0)) revert InvalidConfig();
+        quoteTokenAllowed[quoteToken] = allowed;
+        emit QuoteTokenSet(quoteToken, allowed);
     }
 
     function setLaunchFinalizer(address launch, address finalizer_) external onlyOwner {
@@ -57,6 +73,7 @@ contract LaunchFactory is ArborOwnable {
         if (config.setupMode == ArborFoundryTypes.SetupMode.SelfServe) {
             if (config.saleType != ArborFoundryTypes.SaleType.FairLaunch) revert InvalidConfig();
         }
+        if (quoteTokenAllowlistEnabled && !quoteTokenAllowed[config.quoteToken]) revert QuoteTokenNotAllowed();
 
         SaleVault vault = new SaleVault(config, platformTreasury);
         if (finalizer != address(0)) {
