@@ -4,6 +4,7 @@ param(
     [switch]$DeployArbor,
     [switch]$VerifyArbor,
     [switch]$RunFairLaunch,
+    [switch]$RunRefundLaunch,
     [switch]$Broadcast
 )
 
@@ -168,6 +169,20 @@ try {
         Invoke-ForgeScript -Arguments @(
             "script",
             "script/RunFairLaunchRehearsal.s.sol:RunFairLaunchRehearsal",
+            "--rpc-url",
+            $RpcUrl
+        )
+    }
+
+    if ($RunRefundLaunch) {
+        Set-RequiredDeployerPrivateKey
+        Test-RequiredEnv @(
+            "LAUNCH_FACTORY",
+            "USDT_QUOTE_TOKEN"
+        )
+        Invoke-ForgeScript -Arguments @(
+            "script",
+            "script/RunRefundLaunchRehearsal.s.sol:RunRefundLaunchRehearsal",
             "--rpc-url",
             $RpcUrl
         )

@@ -101,6 +101,11 @@ If `ARBOR_OWNER` is different from the deployer, that wallet must call `acceptOw
 
 For mock Topaz rehearsal, deploy the mock factory/router/USDT first with `contracts/script/DeployMockTopazV2.s.sol`, then use those addresses as `TOPAZ_FACTORY`, `TOPAZ_ROUTER`, and `USDT_QUOTE_TOKEN`.
 
+After deployed wiring is verified, run both scripted outcome rehearsals from `docs/bnb-testnet-mock-topaz-rehearsal.md`:
+
+- `-RunFairLaunch` for the successful finalization path.
+- `-RunRefundLaunch` for the failed-launch refund path.
+
 ## 5. Post-Deploy Checks
 
 After deployment, confirm:

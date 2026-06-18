@@ -124,7 +124,25 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-
 
 This deploys a rehearsal token, creates a Fair Launch, funds the sale, contributes mock USDT, finalizes through the mock Topaz router/factory, and registers the LP lock.
 
-## 7. Rehearsal Success Criteria
+## 7. Scripted Refund Rehearsal
+
+After the successful fair-launch rehearsal works, run the failed-launch path. This creates a launch, contributes below the soft cap, enables refunds, and claims the refund back to the buyer.
+
+Dry run:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunRefundLaunch
+```
+
+Broadcast only after the dry run succeeds:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunRefundLaunch -Broadcast
+```
+
+This path should leave the launch in `Refunding`, return the mock USDT contribution, keep platform fee at `0`, and skip Topaz pair creation/finalization.
+
+## 8. Rehearsal Success Criteria
 
 The testnet rehearsal is considered useful when:
 
@@ -133,6 +151,6 @@ The testnet rehearsal is considered useful when:
 - Deployed addresses pass `-VerifyArbor`.
 - A scripted test launch can be created with mock USDT as the quote token.
 - A successful scripted test launch can finalize into the mock Topaz router/factory.
-- A failed test launch can enter refunds with no platform success fee.
+- A failed scripted test launch can enter refunds and return the buyer's mock USDT with no platform success fee.
 
-After this, the next engineering step is to add the matching scripted refund rehearsal and then wire the frontend to read these testnet contracts.
+After this, the next engineering step is to wire the frontend to read these testnet contracts and display live launch status from chain.

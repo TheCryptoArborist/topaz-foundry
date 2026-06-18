@@ -472,7 +472,7 @@ Before BNB mainnet:
 3. Deploy Arbor Foundry contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
 4. Verify deployed testnet wiring with `contracts/script/VerifyArborFoundryTestnet.s.sol`.
 5. Run one successful scripted fair launch with `contracts/script/RunFairLaunchRehearsal.s.sol`.
-6. Run one failed/refunding fair launch.
+6. Run one failed/refunding fair launch with `contracts/script/RunRefundLaunchRehearsal.s.sol`.
 7. Run one guided setup fixed-price launch as admin-assisted.
 8. Run one guided setup liquidity bootstrap as admin-assisted.
 9. Verify accounting and proof page output.
@@ -489,7 +489,7 @@ Before BNB mainnet:
 - Add deployment-prep script and checklist. Status: started with dry-run script and required-value checklist.
 - Add local BNB fork rehearsal helper. Status: started with PowerShell helper and rehearsal guide.
 - Add BNB testnet mock Topaz rehearsal layer. Status: deployed on BNB testnet with mock factory/router/pair/ERC20 contracts and Arbor Foundry MVP contracts.
-- Add BNB testnet verification and fair-launch rehearsal scripts. Status: started with read-only wiring verification and one successful fair-launch path.
+- Add BNB testnet verification and launch rehearsal scripts. Status: started with read-only wiring verification, one successful fair-launch path, and one failed-launch refund path.
 
 ### Phase 2: Backend/Admin
 
@@ -551,6 +551,6 @@ The current frontend prototype already represents:
 - Local BNB fork rehearsal helper for repeatable pre-testnet checks.
 - BNB testnet mock Topaz rehearsal layer for public testnet deployment practice.
 - Current BNB testnet deployment record in `docs/bnb-testnet-deployment-record.md`.
-- Read-only deployed-contract verification script and scripted fair-launch rehearsal path.
+- Read-only deployed-contract verification script, scripted fair-launch success path, and scripted failed-launch refund path.
 
-The next engineering step is to run the scripted BNB testnet fair-launch rehearsal, add the matching refund rehearsal, then wire the frontend to read BNB testnet contract state.
+The next engineering step is to wire the frontend to read BNB testnet contract state and display live launch status from chain.

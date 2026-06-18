@@ -41,4 +41,4 @@ The prototype shows:
 - Admin/private accounting for total raised, expected and collected success fees, failed launches at $0 fee, liquidity committed, LP fee split status, approval queue, finalization tasks, and refund tasks.
 - Custom Arbor Foundry tree logo in `assets/arbor-foundry-logo.jpeg`.
 
-No wallet transaction, contract call, or backend request is made from the frontend yet. The `contracts/` folder is the starting Solidity scaffold for the MVP and now includes deployment-prep commands, local/testnet rehearsals, and a BNB testnet deployment record, but still needs expanded edge-case tests, frontend wallet wiring, backend/indexer work, and security review before handling mainnet user funds.
+No wallet transaction, contract call, or backend request is made from the frontend yet. The `contracts/` folder is the starting Solidity scaffold for the MVP and now includes deployment-prep commands, local/testnet success and refund rehearsals, and a BNB testnet deployment record, but still needs expanded edge-case tests, frontend wallet wiring, backend/indexer work, and security review before handling mainnet user funds.

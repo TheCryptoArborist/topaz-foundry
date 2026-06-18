@@ -30,6 +30,7 @@ Included support files:
 - `script/DeployMockTopazV2.s.sol` - rehearsal-only mock Topaz deploy script for BNB testnet.
 - `script/VerifyArborFoundryTestnet.s.sol` - read-only BNB testnet deployment wiring check.
 - `script/RunFairLaunchRehearsal.s.sol` - end-to-end BNB testnet fair-launch rehearsal against the mock Topaz layer.
+- `script/RunRefundLaunchRehearsal.s.sol` - end-to-end BNB testnet failed-launch refund rehearsal.
 - `test/ArborFoundryMvp.t.sol` - first Foundry test suite with local mock ERC20 and Topaz V2 contracts.
 
 First-pass tests cover:
@@ -100,4 +101,4 @@ cd "C:\Users\peter\OneDrive\Documents\Topaz Dex\topaz-foundry-github"
 powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployMocks
 ```
 
-After deployment, use `-VerifyArbor` to confirm the deployed wiring and `-RunFairLaunch` to rehearse one complete fair launch. See `../docs/bnb-testnet-mock-topaz-rehearsal.md` and `../docs/bnb-testnet-deployment-record.md` for the full sequence and current BNB testnet addresses.
+After deployment, use `-VerifyArbor` to confirm the deployed wiring, `-RunFairLaunch` to rehearse one complete successful fair launch, and `-RunRefundLaunch` to rehearse a failed launch refund. See `../docs/bnb-testnet-mock-topaz-rehearsal.md` and `../docs/bnb-testnet-deployment-record.md` for the full sequence and current BNB testnet addresses.

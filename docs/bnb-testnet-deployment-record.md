@@ -74,3 +74,19 @@ powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-
 ```
 
 Do not paste the private key into chat, screenshots, GitHub, or docs.
+
+## Run A Sample Refund Launch
+
+Dry run first:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunRefundLaunch
+```
+
+Broadcast only after the dry run is reviewed:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -RunRefundLaunch -Broadcast
+```
+
+This is the failed-launch path: below-soft-cap contribution, refund mode, and buyer refund claim.
