@@ -7,6 +7,7 @@ It is intentionally dependency-free for the first pass:
 - No OpenZeppelin imports yet.
 - No external package install required to read the contracts.
 - Foundry layout is used because it is lightweight for Solidity tests and local forks.
+- `via_ir = true` is enabled because the launch finalization flow has enough accounting fields to otherwise hit Solidity's stack-depth limit.
 
 ## Current Scope
 
