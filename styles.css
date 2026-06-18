@@ -507,11 +507,25 @@ h3 {
   opacity: 0.85;
 }
 
+.token-logo.has-image::before,
+.project-mark-hero.has-image::before,
+.project-mark-hero.has-image::after {
+  display: none;
+}
+
 .token-logo span {
   position: relative;
   z-index: 1;
   color: currentColor;
   font-size: 12px;
+}
+
+.token-logo img,
+.project-mark-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .project-mark-hero {
@@ -1601,6 +1615,19 @@ h3 {
   font-weight: 900;
   font-size: 13px;
   letter-spacing: 0;
+  overflow: hidden;
+}
+
+.token-logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.file-field-stack {
+  display: grid;
+  gap: 6px;
 }
 
 .review-list {

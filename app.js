@@ -486,6 +486,9 @@ const state = {
   wizardForm: {
     tokenName: "Aurora",
     symbol: "AUR",
+    tokenLogo: "",
+    tokenLogoName: "",
+    tokenLogoDataUrl: "",
     saleToken: "",
     totalSupply: "100000000",
     saleTokenAmount: "1000000",
@@ -803,6 +806,104 @@ function isEvmAddress(address) {
   return /^0x[a-fA-F0-9]{40}$/.test(address || "");
 }
 
+const tokenLogoStorageKey = "arbor-foundry-token-logos-v1";
+
+function canUseLocalStorage() {
+  try {
+    return typeof window !== "undefined" && Boolean(window.localStorage);
+  } catch (error) {
+    return false;
+  }
+}
+
+function readStoredTokenLogos() {
+  if (!canUseLocalStorage()) return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(tokenLogoStorageKey) || "{}");
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeStoredTokenLogos(logos) {
+  if (!canUseLocalStorage()) return;
+  try {
+    window.localStorage.setItem(tokenLogoStorageKey, JSON.stringify(logos));
+  } catch (error) {
+    showToast("Logo preview is set, but this browser could not save it for reloads.");
+  }
+}
+
+function tokenLogoKeys({ saleToken = "", launchAddress = "", symbol = "" } = {}) {
+  const keys = [];
+  if (isEvmAddress(launchAddress)) keys.push(`launch:${normalizeAddress(launchAddress)}`);
+  if (isEvmAddress(saleToken)) keys.push(`token:${normalizeAddress(saleToken)}`);
+  const cleanSymbol = String(symbol || "").trim().toUpperCase();
+  if (cleanSymbol) keys.push(`symbol:${cleanSymbol}`);
+  return keys;
+}
+
+function rememberTokenLogo(keys, dataUrl, name = "") {
+  if (!dataUrl || !keys.length) return;
+  const logos = readStoredTokenLogos();
+  keys.forEach((key) => {
+    logos[key] = { dataUrl, name, savedAt: Date.now() };
+  });
+  writeStoredTokenLogos(logos);
+}
+
+function rememberWizardTokenLogo() {
+  const form = state.wizardForm;
+  const keys = tokenLogoKeys({
+    saleToken: form.saleToken,
+    launchAddress: state.testnetLaunchTx.launchAddress,
+    symbol: form.symbol,
+  });
+  rememberTokenLogo(keys, form.tokenLogoDataUrl, form.tokenLogoName);
+}
+
+function storedTokenLogo({ saleToken = "", launchAddress = "", symbol = "" } = {}) {
+  const logos = readStoredTokenLogos();
+  const key = tokenLogoKeys({ saleToken, launchAddress, symbol }).find((item) => logos[item]?.dataUrl);
+  const dataUrl = key ? logos[key].dataUrl : "";
+  return /^data:image\/(png|jpeg|webp);base64,/i.test(dataUrl) ? dataUrl : "";
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read the selected logo file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeImageDataUrl(dataUrl, maxSize = 512) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/webp", 0.86));
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+}
+
+async function tokenLogoDataUrlFromFile(file) {
+  if (!file) throw new Error("Choose a logo file.");
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    throw new Error("Use a PNG, JPG, or WebP logo image.");
+  }
+  const dataUrl = await readFileAsDataUrl(file);
+  return file.size > 750000 ? resizeImageDataUrl(dataUrl) : dataUrl;
+}
+
 function numericChainId(chainId) {
   if (!chainId) return null;
   if (typeof chainId === "number") return chainId;
@@ -1085,6 +1186,7 @@ async function deployTestSaleToken() {
     if (!isEvmAddress(receipt.contractAddress)) throw new Error("Token deployed, but no contract address was returned yet.");
 
     state.wizardForm.saleToken = receipt.contractAddress;
+    rememberWizardTokenLogo();
     state.testTokenTx = {
       status: "Test token deployed and filled in.",
       hash,
@@ -1231,6 +1333,7 @@ async function createTestnetLaunchDraft() {
       launchAddress,
       error: "",
     };
+    rememberWizardTokenLogo();
     await refreshTestnetData(true);
     renderApp();
     showToast("Draft launch created on BNB testnet.");
@@ -1361,6 +1464,8 @@ function resumeTestnetLaunch(launchAddress) {
   }
 
   const config = launch.config || {};
+  state.wizardForm.tokenName = launch.tokenMeta?.name || state.wizardForm.tokenName;
+  state.wizardForm.symbol = launch.tokenMeta?.symbol || state.wizardForm.symbol;
   state.wizardForm.saleToken = config.saleToken || state.wizardForm.saleToken;
   state.wizardForm.saleTokenAmount = config.saleTokenAmount === undefined ? state.wizardForm.saleTokenAmount : formUnits(config.saleTokenAmount);
   state.wizardForm.saleType = String(config.saleType ?? state.wizardForm.saleType);
@@ -1369,6 +1474,14 @@ function resumeTestnetLaunch(launchAddress) {
   state.wizardForm.walletMin = config.walletMin === undefined ? state.wizardForm.walletMin : formUnits(config.walletMin);
   state.wizardForm.walletMax = config.walletMax === undefined ? state.wizardForm.walletMax : formUnits(config.walletMax);
   state.wizardForm.liquidityPercent = basisPointsToPercent(config.liquidityBps ?? parseBasisPoints(state.wizardForm.liquidityPercent));
+  const savedLogo = storedTokenLogo({
+    saleToken: config.saleToken,
+    launchAddress: launch.address,
+    symbol: state.wizardForm.symbol,
+  });
+  state.wizardForm.tokenLogo = savedLogo;
+  state.wizardForm.tokenLogoDataUrl = savedLogo;
+  state.wizardForm.tokenLogoName = savedLogo ? state.wizardForm.tokenLogoName : "";
   state.testnetLaunchTx = {
     status: `Resumed ${launch.statusLabel} SaleVault. Next: ${testnetLaunchNextAction(launch)}.`,
     hash: "",
@@ -2091,6 +2204,7 @@ function testnetLaunchesForLaunchpad() {
     const liquidityPercent = Number(basisPointsToPercent(config.liquidityBps || 0)) || 0;
     const vault = launch.address;
     const token = config.saleToken || "";
+    const logoDataUrl = storedTokenLogo({ saleToken: token, launchAddress: vault, symbol });
     const summary =
       status === "live"
         ? "This real BNB testnet SaleVault is open and accepting mock USDT deposits for the rehearsal launch."
@@ -2102,6 +2216,7 @@ function testnetLaunchesForLaunchpad() {
       symbol,
       status,
       color: colors[launch.index % colors.length],
+      logoDataUrl,
       raised,
       goal: hardCap,
       softCap,
@@ -2200,9 +2315,12 @@ function renderLogo(size = "small") {
 function renderProjectMark(launch, size = "small") {
   const symbol = size === "hero" ? launch.symbol.slice(0, 3) : launch.symbol.slice(0, 2);
   const className = size === "hero" ? "project-mark-hero" : "token-logo";
+  const image = launch.logoDataUrl
+    ? `<img src="${escapeHtml(launch.logoDataUrl)}" alt="" />`
+    : `<span>${escapeHtml(symbol)}</span>`;
   return `
-    <div class="${className}" style="--logo-color:${launch.color}" role="img" aria-label="${launch.symbol} token mark">
-      <span>${symbol}</span>
+    <div class="${className} ${launch.logoDataUrl ? "has-image" : ""}" style="--logo-color:${launch.color}" role="img" aria-label="${escapeHtml(launch.symbol)} token mark">
+      ${image}
     </div>
   `;
 }
@@ -2971,7 +3089,7 @@ function testnetLaunchRows() {
         : testnetLaunchNextAction(launch),
     resumableTestnetLaunch(launch)
       ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
-      : `<span class="micro">${launch.statusLabel === "Live" ? "Deposits open" : "No setup action"}</span>`,
+      : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Set logo</button>`,
   ]);
 }
 
@@ -3753,12 +3871,21 @@ function renderWizardField([label, value, type = "text", options = [], key = ""]
   }
 
   if (type === "file") {
+    const preview = state.wizardForm.tokenLogoDataUrl
+      ? `<img src="${escapeHtml(state.wizardForm.tokenLogoDataUrl)}" alt="" />`
+      : `<span>${escapeHtml(state.wizardForm.symbol || fieldValue || "LOGO").slice(0, 4)}</span>`;
+    const filename = state.wizardForm.tokenLogoName
+      ? `<span class="micro">Selected: ${escapeHtml(state.wizardForm.tokenLogoName)}</span>`
+      : '<span class="micro">PNG, JPG, or WebP. Stored locally for this prototype.</span>';
     return `
       <div class="form-field full">
         <label>${label}</label>
         <div class="logo-upload-row">
-          <div class="token-logo-preview" aria-hidden="true">${escapeHtml(fieldValue)}</div>
-          <input${binding} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+          <div class="token-logo-preview ${state.wizardForm.tokenLogoDataUrl ? "has-image" : ""}" aria-hidden="true">${preview}</div>
+          <div class="file-field-stack">
+            <input${binding} type="file" accept="image/png,image/jpeg,image/webp" />
+            ${filename}
+          </div>
         </div>
       </div>
     `;
@@ -3845,8 +3972,11 @@ function renderTestnetLaunchWriter() {
   const errors = testnetLaunchValidation();
   const launchAddress = tx.launchAddress;
   const hasLaunch = isEvmAddress(launchAddress);
+  const selectedLaunch = (state.testnetData.launches || []).find((launch) => addressMatches(launch.address, launchAddress));
+  const canResumeSetup = resumableTestnetLaunch(selectedLaunch);
   const canRunVaultActions =
     hasLaunch &&
+    canResumeSetup &&
     Number(form.saleType) === 0 &&
     state.connected &&
     isWalletOnBnbTestnet() &&
@@ -3865,8 +3995,9 @@ function renderTestnetLaunchWriter() {
       </div>
       <div class="assist-note">
         <strong>${hasLaunch ? "What this controls" : "What this sends"}</strong>
-        <span>${hasLaunch ? "This resumes the selected on-chain SaleVault and sends the remaining setup transactions from the owner wallet." : "This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches."}</span>
+        <span>${hasLaunch ? "This loads the selected on-chain SaleVault. You can attach a local logo, and setup buttons only enable while the launch is still Draft, Approved, or Upcoming." : "This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches."}</span>
       </div>
+      ${hasLaunch ? renderWizardField(["Token logo", "", "file", [], "tokenLogo"]) : ""}
       <div class="review-list">
         ${[
           ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected"],
@@ -3908,7 +4039,7 @@ function renderWizardContent() {
       <div class="review-list">
         ${[
           ["Token", "Fixed supply, no transfer tax"],
-          ["Token logo", "Project image uploaded"],
+          ["Token logo", state.wizardForm.tokenLogoDataUrl ? "Project image selected" : "Initials fallback"],
           ["Sale type", `${saleTypeLabel(state.wizardForm.saleType)} (${setupModeForSaleType(state.wizardForm.saleType) === 0 ? "self-serve" : "guided setup"})`],
           ["Sale goals", `${escapeHtml(state.wizardForm.softCap)} / ${escapeHtml(state.wizardForm.hardCap)} USDT`],
           ["Liquidity goal", `${escapeHtml(state.wizardForm.liquidityPercent)}% of net raise to Topaz LP`],
@@ -3931,7 +4062,7 @@ function renderWizardContent() {
     Token: [
       ["Token name", "Aurora", "text", [], "tokenName"],
       ["Symbol", "AUR", "text", [], "symbol"],
-      ["Token logo", "AUR", "file"],
+      ["Token logo", "", "file", [], "tokenLogo"],
       ["Sale token contract", "", "text", [], "saleToken"],
       ["Total supply", "100000000", "number", [], "totalSupply"],
       ["Contract mode", "Standard fixed supply", "select", ["Standard fixed supply", "Existing verified token", "Review required"]],
@@ -4241,7 +4372,7 @@ async function handleClick(event) {
   }
 }
 
-function handleInput(event) {
+async function handleInput(event) {
   if (event.target.dataset.input === "contribution") {
     state.contribution = event.target.value;
     renderApp();
@@ -4249,7 +4380,27 @@ function handleInput(event) {
 
   const wizardField = event.target.dataset.wizardField;
   if (wizardField) {
+    if (wizardField === "tokenLogo" && event.target.type === "file") {
+      try {
+        const file = event.target.files?.[0];
+        const dataUrl = await tokenLogoDataUrlFromFile(file);
+        state.wizardForm.tokenLogo = dataUrl;
+        state.wizardForm.tokenLogoDataUrl = dataUrl;
+        state.wizardForm.tokenLogoName = file.name;
+        rememberWizardTokenLogo();
+        renderApp();
+        showToast("Token logo saved for this browser.");
+      } catch (error) {
+        state.wizardForm.tokenLogo = "";
+        state.wizardForm.tokenLogoDataUrl = "";
+        state.wizardForm.tokenLogoName = "";
+        renderApp();
+        showToast(error.message || "Logo upload was not completed.");
+      }
+      return;
+    }
     state.wizardForm[wizardField] = event.target.value;
+    if (wizardField === "saleToken" || wizardField === "symbol") rememberWizardTokenLogo();
     if (["saleToken", "saleTokenAmount", "saleType"].includes(wizardField)) {
       state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
     }
