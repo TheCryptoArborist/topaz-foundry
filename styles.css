@@ -1851,6 +1851,22 @@ h3 {
   line-height: 1.45;
 }
 
+.finalization-box {
+  margin-top: 14px;
+  border: 1px solid rgba(54, 230, 182, 0.26);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(54, 230, 182, 0.055);
+}
+
+.compact-form-grid {
+  margin-top: 12px;
+}
+
+.finalization-actions {
+  margin-top: 12px;
+}
+
 .address-code {
   max-width: min(100%, 420px);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;

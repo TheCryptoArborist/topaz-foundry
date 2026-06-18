@@ -495,6 +495,7 @@ const state = {
     saleToken: "",
     totalSupply: "100000000",
     saleTokenAmount: "1000000",
+    lpTokenAmount: "1000000",
     saleType: "0",
     projectSummary: "A short launch description buyers can inspect.",
     softCap: "25000",
@@ -520,6 +521,12 @@ const state = {
   contributionTx: {
     status: "",
     hash: "",
+    error: "",
+  },
+  finalizationTx: {
+    status: "",
+    hash: "",
+    pair: "",
     error: "",
   },
   testTokenTx: {
@@ -671,6 +678,8 @@ const contractSelectors = {
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
+  topazFinalizeLaunch: "0x58e76b9e",
+  topazGetPool: "0x79bc57d5",
   erc20Name: "0x06fdde03",
   erc20Symbol: "0x95d89b41",
 };
@@ -1013,6 +1022,10 @@ function encodeAbiAddress(address) {
 
 function encodeAbiUint(value) {
   return BigInt(value).toString(16).padStart(64, "0");
+}
+
+function encodeAbiBool(value) {
+  return encodeAbiUint(value ? 1 : 0);
 }
 
 function stringToHex(value) {
@@ -1419,6 +1432,114 @@ async function runTestnetLaunchAction(action) {
   }
 }
 
+function buildFinalizeLaunchData(launch) {
+  const config = launch.config || {};
+  const tokenAmountDesired = parseUnits(state.wizardForm.lpTokenAmount || state.wizardForm.saleTokenAmount);
+  const quoteToken = config.quoteToken || bnbTestnet.contracts.mockUsdt;
+  const creator = isEvmAddress(config.creator) ? config.creator : state.walletAddress;
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 60);
+  const words = [
+    encodeAbiAddress(launch.address),
+    encodeAbiAddress(config.saleToken),
+    encodeAbiAddress(quoteToken),
+    encodeAbiAddress(creator),
+    encodeAbiAddress(bnbTestnet.contracts.lpLocker),
+    encodeAbiUint(tokenAmountDesired),
+    encodeAbiUint(1),
+    encodeAbiUint(1),
+    encodeAbiUint(deadline),
+  ];
+  return `${contractSelectors.topazFinalizeLaunch}${words.join("")}`;
+}
+
+async function readTopazPair(token, quoteToken) {
+  const data = `${contractSelectors.topazGetPool}${encodeAbiAddress(token)}${encodeAbiAddress(quoteToken)}${encodeAbiBool(false)}`;
+  return decodeAddress(await ethCall(bnbTestnet.contracts.mockTopazFactory, data));
+}
+
+async function approveFinalizerTokens() {
+  const launch = selectedTestnetLaunch();
+  const validation = finalizationValidation(launch);
+  if (!validation.ok) {
+    state.finalizationTx = { ...state.finalizationTx, status: "Finalization not ready.", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  const tokenAmountDesired = parseUnits(state.wizardForm.lpTokenAmount || state.wizardForm.saleTokenAmount);
+  const token = launch.config.saleToken;
+
+  try {
+    state.finalizationTx = { status: "LP token approval: waiting for wallet approval...", hash: "", pair: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(
+      token,
+      `${contractSelectors.erc20Approve}${encodeAbiAddress(bnbTestnet.contracts.topazFinalizer)}${encodeAbiUint(tokenAmountDesired)}`,
+    );
+    state.finalizationTx = { status: "LP token approval submitted. Waiting for confirmation...", hash, pair: "", error: "" };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error("LP token approval reverted.");
+    state.finalizationTx = { status: "LP token approval confirmed. Finalize Launch is ready.", hash, pair: "", error: "" };
+    renderApp();
+    showToast("LP token approval confirmed.");
+  } catch (error) {
+    const message = error.message || "LP token approval was not completed.";
+    state.finalizationTx = { ...state.finalizationTx, status: "LP token approval not completed.", error: message };
+    renderApp();
+    showToast(message);
+  }
+}
+
+async function finalizeTestnetLaunch() {
+  const launch = selectedTestnetLaunch();
+  const validation = finalizationValidation(launch);
+  if (!validation.ok) {
+    state.finalizationTx = { ...state.finalizationTx, status: "Finalization not ready.", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  const tokenAmountDesired = parseUnits(state.wizardForm.lpTokenAmount || state.wizardForm.saleTokenAmount);
+  const token = launch.config.saleToken;
+  const quoteToken = launch.config.quoteToken || bnbTestnet.contracts.mockUsdt;
+
+  try {
+    state.finalizationTx = { status: "Checking LP token approval...", hash: "", pair: "", error: "" };
+    renderApp();
+    await ensureTestnetWallet();
+    const allowance = await readErc20Allowance(token, state.walletAddress, bnbTestnet.contracts.topazFinalizer);
+    if (allowance < tokenAmountDesired) {
+      throw new Error("Approve LP Tokens first so the finalizer can create Topaz liquidity.");
+    }
+
+    state.finalizationTx = { status: "Finalize launch: waiting for wallet approval...", hash: "", pair: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(bnbTestnet.contracts.topazFinalizer, buildFinalizeLaunchData(launch));
+    state.finalizationTx = { status: "Finalization submitted. Waiting for confirmation...", hash, pair: "", error: "" };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error("Finalization transaction reverted.");
+    const pair = await readTopazPair(token, quoteToken);
+    state.finalizationTx = {
+      status: `Launch finalized. Topaz pair ${pair ? shortAddress(pair) : "created"} is ready for proof.`,
+      hash,
+      pair,
+      error: "",
+    };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("Launch finalized on BNB testnet.");
+  } catch (error) {
+    const message = error.message || "Finalization was not completed.";
+    state.finalizationTx = { ...state.finalizationTx, status: "Finalization not completed.", error: message };
+    renderApp();
+    showToast(message);
+  }
+}
+
 function contributionValidation(launch) {
   if (launch.status !== "live") return { ok: false, message: "This launch is not accepting deposits." };
   if (!launch.testnet?.vault) return { ok: false, message: "This demo launch is still preview-only." };
@@ -1551,6 +1672,43 @@ async function readTokenMeta(address) {
   return tokenMeta;
 }
 
+function testnetSoftCapMet(launch) {
+  const softCap = BigInt(launch?.config?.softCap || 0n);
+  const raised = BigInt(launch?.totalRaised || 0n);
+  return softCap > 0n && raised >= softCap;
+}
+
+function testnetLaunchFinalizable(launch) {
+  return launch?.statusLabel === "Live" && testnetSoftCapMet(launch);
+}
+
+function selectedTestnetLaunch() {
+  const launchAddress = state.testnetLaunchTx.launchAddress;
+  if (!isEvmAddress(launchAddress)) return null;
+  return (state.testnetData.launches || []).find((launch) => addressMatches(launch.address, launchAddress)) || null;
+}
+
+function ownerWalletReady() {
+  return state.connected && isWalletOnBnbTestnet() && addressMatches(state.walletAddress, bnbTestnet.expectedOwner);
+}
+
+function finalizationValidation(launch) {
+  if (!isEvmAddress(launch?.address)) return { ok: false, message: "Select a testnet SaleVault first." };
+  if (!ownerWalletReady()) return { ok: false, message: "Connect the owner wallet on BNB testnet." };
+  if (launch.statusLabel !== "Live") return { ok: false, message: "Only a live SaleVault can be finalized." };
+  if (!testnetSoftCapMet(launch)) return { ok: false, message: "The launch must meet soft cap before finalization." };
+  if (Number(launch.config?.saleType || 0) !== 0) return { ok: false, message: "Only fair-launch self-serve mode is wired for testnet finalization." };
+
+  try {
+    const amount = parseUnits(state.wizardForm.lpTokenAmount || state.wizardForm.saleTokenAmount);
+    if (amount <= 0n) return { ok: false, message: "Enter project tokens for the Topaz LP." };
+  } catch (error) {
+    return { ok: false, message: error.message || "Enter a valid LP token amount." };
+  }
+
+  return { ok: true, message: "Ready to finalize this launch on BNB testnet." };
+}
+
 function testnetLaunchNextAction(launch) {
   if (!launch) return "Select a launch";
   if (launch.statusLabel === "Draft") {
@@ -1559,6 +1717,7 @@ function testnetLaunchNextAction(launch) {
   if (launch.statusLabel === "Approved" || launch.statusLabel === "Upcoming") {
     return launch.saleTokensFunded ? "Open launch" : "Approve tokens, fund vault, open launch";
   }
+  if (testnetLaunchFinalizable(launch)) return "Ready to finalize";
   if (launch.statusLabel === "Live") return "Accepting deposits";
   if (launch.statusLabel === "Finalized") return "Finalized";
   if (launch.statusLabel === "Refunding") return "Refund path proven";
@@ -1581,6 +1740,7 @@ function resumeTestnetLaunch(launchAddress) {
   state.wizardForm.symbol = launch.tokenMeta?.symbol || state.wizardForm.symbol;
   state.wizardForm.saleToken = config.saleToken || state.wizardForm.saleToken;
   state.wizardForm.saleTokenAmount = config.saleTokenAmount === undefined ? state.wizardForm.saleTokenAmount : formUnits(config.saleTokenAmount);
+  state.wizardForm.lpTokenAmount = state.wizardForm.lpTokenAmount || state.wizardForm.saleTokenAmount;
   state.wizardForm.saleType = String(config.saleType ?? state.wizardForm.saleType);
   state.wizardForm.softCap = config.softCap === undefined ? state.wizardForm.softCap : formUnits(config.softCap);
   state.wizardForm.hardCap = config.hardCap === undefined ? state.wizardForm.hardCap : formUnits(config.hardCap);
@@ -1601,6 +1761,7 @@ function resumeTestnetLaunch(launchAddress) {
     launchAddress: launch.address,
     error: "",
   };
+  state.finalizationTx = { status: "", hash: "", pair: "", error: "" };
   state.wizardStep = wizardSteps.length - 1;
   renderApp();
   showToast(`Resumed ${shortAddress(launch.address)}.`);
@@ -3236,7 +3397,9 @@ function testnetLaunchRows() {
         : testnetLaunchNextAction(launch),
     resumableTestnetLaunch(launch)
       ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
-      : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Set logo</button>`,
+      : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">${
+          testnetLaunchFinalizable(launch) ? "Finalize" : launch.statusLabel === "Finalized" ? "View proof" : "Set logo"
+        }</button>`,
   ]);
 }
 
@@ -3248,7 +3411,7 @@ function renderTestnetResumePanel() {
   return `
     <section class="panel pad callout">
       <h3>Continue A Test Launch</h3>
-      <p class="muted">Choose Continue setup beside a Draft, Approved, or Upcoming SaleVault. Arbor Foundry will load that on-chain launch into the action panel so you can approve tokens, fund the vault, approve the launch, and open it.</p>
+      <p class="muted">Choose the action beside a SaleVault. Arbor Foundry will load that on-chain launch into this panel so you can continue setup, attach a local logo, or finalize a live launch after soft cap is met.</p>
     </section>
   `;
 }
@@ -4117,6 +4280,73 @@ function renderMissingLaunchFields(issues) {
   `;
 }
 
+function renderTestnetFinalizationPanel(launch) {
+  if (!launch || !["Live", "Finalized"].includes(launch.statusLabel)) return "";
+
+  const validation = finalizationValidation(launch);
+  const quoteToken = launch.config?.quoteToken || bnbTestnet.contracts.mockUsdt;
+  const finalizationReady = validation.ok;
+  const pairLink = isEvmAddress(state.finalizationTx.pair)
+    ? `<a class="address-link" href="${explorerAddressUrl(state.finalizationTx.pair)}" target="_blank" rel="noreferrer">${shortAddress(state.finalizationTx.pair)}</a>`
+    : "Created during finalization";
+
+  if (launch.statusLabel === "Finalized") {
+    return `
+      <div class="finalization-box">
+        <div class="panel-title">
+          <h3>Finalization Complete</h3>
+          <span class="status finalized">Finalized</span>
+        </div>
+        <div class="review-list">
+          <div class="review-row"><span>Total raised</span><strong>${formatUnits(launch.totalRaised)} USDT</strong></div>
+          <div class="review-row"><span>Platform success fee</span><strong>${formatUnits(launch.platformFee)} USDT</strong></div>
+          <div class="review-row"><span>Topaz liquidity quote</span><strong>${formatUnits(launch.quoteToLiquidity)} USDT</strong></div>
+          <div class="review-row"><span>Creator proceeds</span><strong>${formatUnits(launch.creatorProceeds)} USDT</strong></div>
+          <div class="review-row"><span>Topaz pair</span><strong>${pairLink}</strong></div>
+        </div>
+        <div class="success-note show">
+          Finalized launches should now publish proof, LP lock status, and buyer claim instructions.
+          ${state.finalizationTx.hash ? `<br><a href="${explorerTxLink(state.finalizationTx.hash)}" target="_blank" rel="noreferrer">View finalization transaction</a>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="finalization-box">
+      <div class="panel-title">
+        <h3>Finalize This Test Launch</h3>
+        <span class="status ${testnetSoftCapMet(launch) ? "ready" : "upcoming"}">${testnetSoftCapMet(launch) ? "Soft cap met" : "Waiting for soft cap"}</span>
+      </div>
+      <div class="assist-note">
+        <strong>What finalization does</strong>
+        <span>It closes the SaleVault, sends the 2% success fee to Arbor Foundry, routes the liquidity share into the Topaz V2 pair, sends creator proceeds, and opens the post-launch proof path.</span>
+      </div>
+      <div class="review-list">
+        <div class="review-row"><span>Total raised</span><strong>${formatUnits(launch.totalRaised)} USDT</strong></div>
+        <div class="review-row"><span>Soft / hard cap</span><strong>${formatUnits(launch.config.softCap)} / ${formatUnits(launch.config.hardCap)} USDT</strong></div>
+        <div class="review-row"><span>Platform success fee</span><strong>${formatUnits(launch.platformFee)} USDT</strong></div>
+        <div class="review-row"><span>Quote routed to Topaz LP</span><strong>${formatUnits(launch.quoteToLiquidity)} USDT</strong></div>
+        <div class="review-row"><span>Creator proceeds</span><strong>${formatUnits(launch.creatorProceeds)} USDT</strong></div>
+        <div class="review-row"><span>Quote asset</span><strong>${renderAddressLink(quoteToken)}</strong></div>
+        <div class="review-row"><span>LP receiver</span><strong>${renderAddressLink(bnbTestnet.contracts.lpLocker)}</strong></div>
+      </div>
+      <div class="form-grid compact-form-grid">
+        ${renderWizardField(["Project tokens for Topaz LP", "", "number", [], "lpTokenAmount"])}
+      </div>
+      <div class="success-note show ${finalizationReady ? "" : "warn"}">${escapeHtml(validation.message)}</div>
+      <div class="success-note ${state.finalizationTx.status || state.finalizationTx.error ? "show" : ""} ${state.finalizationTx.error ? "warn" : ""}">
+        ${escapeHtml(state.finalizationTx.error || state.finalizationTx.status)}
+        ${state.finalizationTx.hash ? `<br><a href="${explorerTxLink(state.finalizationTx.hash)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
+      </div>
+      <div class="tx-actions finalization-actions">
+        <button class="button" type="button" data-action="approve-finalizer-tokens" ${finalizationReady ? "" : "disabled"}>Approve LP Tokens</button>
+        <button class="button primary" type="button" data-action="finalize-testnet-launch" ${finalizationReady ? "" : "disabled"}>Finalize Launch</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderTestnetLaunchWriter() {
   const form = state.wizardForm;
   const tx = state.testnetLaunchTx;
@@ -4177,6 +4407,7 @@ function renderTestnetLaunchWriter() {
         <button class="button gold" type="button" data-action="approve-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Approve Launch</button>
         <button class="button primary" type="button" data-action="open-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Open Launch</button>
       </div>
+      ${renderTestnetFinalizationPanel(selectedLaunch)}
       ${Number(form.saleType) === 0 ? "" : '<p class="muted tx-footnote">Guided sale modes can be drafted on-chain, but buyer deposits for fixed-price and liquidity-bootstrap modes still need their adapter contracts.</p>'}
     </div>
   `;
@@ -4194,6 +4425,7 @@ function renderWizardContent() {
           ["Sale type", `${saleTypeLabel(state.wizardForm.saleType)} (${setupModeForSaleType(state.wizardForm.saleType) === 0 ? "self-serve" : "guided setup"})`],
           ["Sale goals", `${escapeHtml(state.wizardForm.softCap)} / ${escapeHtml(state.wizardForm.hardCap)} USDT`],
           ["Liquidity goal", `${escapeHtml(state.wizardForm.liquidityPercent)}% of net raise to Topaz LP`],
+          ["LP pairing tokens", `${escapeHtml(state.wizardForm.lpTokenAmount)} ${escapeHtml(state.wizardForm.symbol)}`],
           ["LP Lock", "ERC20 LP token minted directly to locker"],
           ["Vesting", "10% TGE, remainder over 9 months"],
           ["Incentives", "No-gauge fee split first, gauge incentives later"],
@@ -4246,7 +4478,7 @@ function renderWizardContent() {
     Liquidity: [
       ["Raise routed to LP %", "60", "number", [], "liquidityPercent"],
       ["Minimum locked liquidity goal", "25000", "number"],
-      ["Project tokens reserved for LP", "Match the creator's launch price", "readonly"],
+      ["Project tokens paired at finalization", "1000000", "number", [], "lpTokenAmount"],
       ["Quote asset", "USDT", "readonly"],
       ["Topaz pool type", "V2 volatile, stable=false", "readonly"],
       ["Slippage minimum %", "1", "number"],
@@ -4463,6 +4695,12 @@ async function handleClick(event) {
     case "open-testnet-launch":
       await runTestnetLaunchAction("openLaunch");
       break;
+    case "approve-finalizer-tokens":
+      await approveFinalizerTokens();
+      break;
+    case "finalize-testnet-launch":
+      await finalizeTestnetLaunch();
+      break;
     case "contribute":
       if (!state.connected) {
         await connectWallet();
@@ -4585,6 +4823,9 @@ async function handleInput(event) {
     if (wizardField === "saleToken" || wizardField === "symbol") rememberWizardTokenLogo();
     if (["saleToken", "saleTokenAmount", "saleType"].includes(wizardField)) {
       state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
+    }
+    if (["lpTokenAmount", "saleTokenAmount"].includes(wizardField)) {
+      state.finalizationTx = { status: "", hash: "", pair: "", error: "" };
     }
     if (["tokenName", "symbol", "totalSupply"].includes(wizardField)) {
       state.testTokenTx = { status: "", hash: "", tokenAddress: "", error: "" };
