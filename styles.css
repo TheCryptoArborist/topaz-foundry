@@ -1612,6 +1612,85 @@ h3 {
   line-height: 1.4;
 }
 
+.missing-checklist,
+.ready-checklist {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(242, 200, 75, 0.34);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: rgba(242, 200, 75, 0.08);
+}
+
+.ready-checklist {
+  border-color: rgba(54, 230, 182, 0.3);
+  background: rgba(54, 230, 182, 0.08);
+}
+
+.missing-head,
+.ready-checklist strong,
+.ready-checklist span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #ffe185;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ready-checklist strong {
+  color: var(--green);
+}
+
+.ready-checklist span {
+  justify-content: flex-start;
+  color: var(--text-soft);
+}
+
+.missing-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(242, 200, 75, 0.24);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  background: rgba(5, 12, 14, 0.46);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.missing-item:hover,
+.missing-item:focus-visible {
+  border-color: rgba(242, 200, 75, 0.58);
+  outline: none;
+}
+
+.missing-item strong,
+.missing-item small {
+  display: block;
+}
+
+.missing-item strong {
+  font-size: 12px;
+}
+
+.missing-item small {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.missing-jump {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .tx-status {
   border: 1px solid var(--line);
   border-radius: var(--radius);

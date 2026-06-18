@@ -1038,15 +1038,18 @@ function buildCreateLaunchData() {
 }
 
 function testnetLaunchValidation() {
-  const errors = [];
+  const issues = [];
   const form = state.wizardForm;
+  const addIssue = (step, title, detail) => {
+    issues.push({ step, title, detail });
+  };
 
-  if (!state.connected) errors.push("Connect the testnet owner wallet.");
-  if (state.connected && !isWalletOnBnbTestnet()) errors.push("Switch to BNB testnet.");
+  if (!state.connected) addIssue(7, "Connect wallet", "Use the owner/admin wallet on BNB testnet.");
+  if (state.connected && !isWalletOnBnbTestnet()) addIssue(7, "Switch network", "Switch MetaMask to BNB Testnet 97.");
   if (state.connected && !addressMatches(state.walletAddress, bnbTestnet.expectedOwner)) {
-    errors.push("This deployed LaunchFactory only lets the owner wallet create launches.");
+    addIssue(7, "Use owner wallet", "This deployed LaunchFactory only lets the owner wallet create launches.");
   }
-  if (!isEvmAddress(form.saleToken)) errors.push("Enter the deployed testnet sale token contract address.");
+  if (!isEvmAddress(form.saleToken)) addIssue(0, "Add sale token contract", "Paste the deployed BNB testnet ERC20 token address.");
 
   try {
     const saleTokenAmount = parseUnits(form.saleTokenAmount);
@@ -1055,23 +1058,23 @@ function testnetLaunchValidation() {
     const walletMin = parseUnits(form.walletMin);
     const walletMax = parseUnits(form.walletMax);
     parseBasisPoints(form.liquidityPercent);
-    if (saleTokenAmount <= 0n) errors.push("Sale token amount must be above zero.");
-    if (softCap <= 0n) errors.push("Soft cap must be above zero.");
-    if (hardCap < softCap) errors.push("Hard cap must be greater than or equal to soft cap.");
-    if (walletMin <= 0n || walletMax < walletMin) errors.push("Wallet max must be greater than or equal to wallet min.");
+    if (saleTokenAmount <= 0n) addIssue(1, "Set sale token amount", "Sale token amount must be above zero.");
+    if (softCap <= 0n) addIssue(1, "Set soft cap", "Soft cap must be above zero.");
+    if (hardCap < softCap) addIssue(1, "Fix hard cap", "Hard cap must be greater than or equal to soft cap.");
+    if (walletMin <= 0n || walletMax < walletMin) addIssue(1, "Fix wallet limits", "Wallet max must be greater than or equal to wallet min.");
   } catch (error) {
-    errors.push(error.message);
+    addIssue(1, "Fix sale numbers", error.message);
   }
 
-  return [...new Set(errors)];
+  return issues.filter((issue, index, all) => all.findIndex((item) => item.title === issue.title && item.detail === issue.detail) === index);
 }
 
 async function createTestnetLaunchDraft() {
   const errors = testnetLaunchValidation();
   if (errors.length) {
-    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: "Needs input", error: errors[0] };
+    state.testnetLaunchTx = { ...state.testnetLaunchTx, status: "Needs input", error: `${errors[0].title}: ${errors[0].detail}` };
     renderApp();
-    showToast(errors[0]);
+    showToast(errors[0].detail);
     return;
   }
 
@@ -3428,6 +3431,39 @@ function renderWizardHelp(step) {
   `;
 }
 
+function renderMissingLaunchFields(issues) {
+  if (!issues.length) {
+    return `
+      <div class="ready-checklist">
+        <strong>Required fields complete</strong>
+        <span>Review the terms, then create the draft launch on BNB testnet.</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="missing-checklist">
+      <div class="missing-head">
+        <strong>Required before testnet creation</strong>
+        <span>${issues.length} item${issues.length === 1 ? "" : "s"} left</span>
+      </div>
+      ${issues
+        .map(
+          (issue) => `
+            <button class="missing-item" type="button" data-step="${issue.step}">
+              <span>
+                <strong>Step ${issue.step + 1}: ${escapeHtml(wizardSteps[issue.step])}</strong>
+                <small>${escapeHtml(issue.title)} - ${escapeHtml(issue.detail)}</small>
+              </span>
+              <span class="missing-jump">Go</span>
+            </button>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function renderTestnetLaunchWriter() {
   const form = state.wizardForm;
   const tx = state.testnetLaunchTx;
@@ -3468,7 +3504,7 @@ function renderTestnetLaunchWriter() {
           .map(([label, value]) => `<div class="review-row"><span>${label}</span><strong>${value}</strong></div>`)
           .join("")}
       </div>
-      ${errors.length ? `<div class="form-error">${errors.map((error) => `<span>${escapeHtml(error)}</span>`).join("")}</div>` : ""}
+      ${renderMissingLaunchFields(errors)}
       ${tx.error ? `<div class="form-error"><span>${escapeHtml(tx.error)}</span></div>` : ""}
       <div class="tx-status">${escapeHtml(status)}</div>
       <div class="tx-actions">
