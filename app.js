@@ -667,6 +667,7 @@ const contractSelectors = {
   erc20Allowance: "0xdd62ed3e",
   erc20BalanceOf: "0x70a08231",
   saleVaultDeposit: "0xb6b55f25",
+  saleVaultContributions: "0x42e94c90",
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
@@ -1432,8 +1433,16 @@ function contributionValidation(launch) {
   }
 
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter a contribution amount above 0." };
-  if (amount < launch.min) return { ok: false, message: `Minimum contribution is ${launch.min.toLocaleString()} ${quoteAsset(launch)}.` };
-  if (amount > launch.max) return { ok: false, message: `Maximum contribution is ${launch.max.toLocaleString()} ${quoteAsset(launch)}.` };
+  const previous = Number(launch.yourContribution || 0);
+  const remaining = Number(launch.remainingMax ?? launch.max);
+  if (previous <= 0 && amount < launch.min) return { ok: false, message: `First contribution minimum is ${launch.min.toLocaleString()} ${quoteAsset(launch)}.` };
+  if (remaining <= 0) return { ok: false, message: `This wallet has reached the ${launch.max.toLocaleString()} ${quoteAsset(launch)} maximum.` };
+  if (amount > remaining) {
+    return {
+      ok: false,
+      message: `This wallet already contributed ${previous.toLocaleString()} ${quoteAsset(launch)}. Remaining max is ${remaining.toLocaleString()} ${quoteAsset(launch)}.`,
+    };
+  }
   return { ok: true, message: `Ready to send a testnet contribution of ${amount.toLocaleString()} ${quoteAsset(launch)}.` };
 }
 
@@ -1640,6 +1649,14 @@ async function readSaleVault(address, index) {
   const config = decodeLaunchConfig(await ethCall(address, contractSelectors.config));
   const saleTokensFunded = decodeBool(await ethCall(address, contractSelectors.saleTokensFunded));
   const tokenMeta = await readTokenMeta(config.saleToken);
+  let walletContribution = 0n;
+  if (state.connected && isEvmAddress(state.walletAddress)) {
+    try {
+      walletContribution = decodeUint256(await ethCall(address, `${contractSelectors.saleVaultContributions}${encodeAbiAddress(state.walletAddress)}`));
+    } catch (error) {
+      walletContribution = 0n;
+    }
+  }
   return {
     index,
     address,
@@ -1654,6 +1671,7 @@ async function readSaleVault(address, index) {
     quoteToLiquidity: decodeUint256(accounting, 3),
     creatorProceeds: decodeUint256(accounting, 4),
     refundTotal: decodeUint256(accounting, 5),
+    walletContribution,
   };
 }
 
@@ -2305,7 +2323,11 @@ function testnetLaunchesForLaunchpad() {
     const hardCap = unitsToNumber(config.hardCap);
     const softCap = unitsToNumber(config.softCap);
     const raised = unitsToNumber(launch.totalRaised);
+    const walletContribution = unitsToNumber(launch.walletContribution || 0n);
     const liquidityPercent = Number(basisPointsToPercent(config.liquidityBps || 0)) || 0;
+    const walletMax = unitsToNumber(config.walletMax);
+    const hardCapRemaining = Math.max(0, hardCap - raised);
+    const remainingWalletMax = Math.max(0, Math.min(walletMax - walletContribution, hardCapRemaining));
     const vault = launch.address;
     const token = config.saleToken || "";
     const logoDataUrl = storedTokenLogo({ saleToken: token, launchAddress: vault, symbol });
@@ -2332,10 +2354,11 @@ function testnetLaunchesForLaunchpad() {
       summary,
       tags: ["BNB Testnet", "On-chain", `SaleVault ${shortAddress(vault)}`],
       min: unitsToNumber(config.walletMin),
-      max: unitsToNumber(config.walletMax),
+      max: walletMax,
+      remainingMax: remainingWalletMax,
       contributors: raised > 0 ? 1 : 0,
       avgContribution: raised,
-      yourContribution: 0,
+      yourContribution: walletContribution,
       vesting: [
         ["TGE", "Configured", "After finalization"],
         ["Claims", "Pro rata", "When finalized"],
@@ -2899,6 +2922,12 @@ function renderContribute(launch) {
   const action = primaryActionFor(launch);
   const disabled = launch.status !== "live";
   const asset = quoteAsset(launch);
+  const remainingMax = Number(launch.remainingMax ?? launch.max);
+  const priorContribution = Number(launch.yourContribution || 0);
+  const minLabel = priorContribution > 0 ? "Top-up minimum" : "First minimum";
+  const minValue = priorContribution > 0 ? `Any amount` : `${launch.min.toLocaleString()} ${asset}`;
+  const maxLabel = priorContribution > 0 ? "Remaining max" : "Maximum";
+  const maxValue = `${remainingMax.toLocaleString()} ${asset}`;
 
   if (disabled) {
     return `
@@ -2929,7 +2958,7 @@ function renderContribute(launch) {
       <div class="input-wrap">
         <div class="field-label"><span>You pay</span><span>Balance: ${state.connected ? `84,120 ${asset}` : "--"}</span></div>
         <div class="amount-input">
-          <input data-input="contribution" type="number" min="${launch.min}" max="${launch.max}" step="1" value="${state.contribution}" placeholder="0.0" />
+          <input data-input="contribution" type="number" min="${priorContribution > 0 ? 0 : launch.min}" max="${remainingMax}" step="1" value="${state.contribution}" placeholder="0.0" />
           <select class="asset-select" aria-label="Pay asset">
             <option>${asset}</option>
           </select>
@@ -2950,8 +2979,9 @@ function renderContribute(launch) {
         <button class="button primary" type="button" data-action="${action.action}">${action.button}</button>
       </div>
       <div class="limits">
-        <div class="metric"><span>Minimum</span><strong>${launch.min.toLocaleString()} ${asset}</strong></div>
-        <div class="metric"><span>Maximum</span><strong>${launch.max.toLocaleString()} ${asset}</strong></div>
+        <div class="metric"><span>${minLabel}</span><strong>${minValue}</strong></div>
+        <div class="metric"><span>${maxLabel}</span><strong>${maxValue}</strong></div>
+        ${priorContribution > 0 ? `<div class="metric"><span>Already contributed</span><strong>${priorContribution.toLocaleString()} ${asset}</strong></div>` : ""}
       </div>
       <div class="assist-note">
         <strong>Before you contribute</strong>
@@ -4385,7 +4415,8 @@ async function handleClick(event) {
   if (quick) {
     const launch = currentLaunch();
     const balance = 84120;
-    state.contribution = Math.min(launch.max, Math.round((balance * Number(quick)) / 100)).toString();
+    const max = Number(launch.remainingMax ?? launch.max);
+    state.contribution = Math.min(max, Math.round((balance * Number(quick)) / 100)).toString();
     state.contributionTx = { status: "", hash: "", error: "" };
     renderApp();
     return;
@@ -4584,6 +4615,7 @@ if (window.ethereum) {
   window.ethereum.on?.("accountsChanged", async () => {
     await syncWalletState().catch(() => {});
     renderApp();
+    await refreshTestnetData(true);
   });
 
   window.ethereum.on?.("chainChanged", (chainId) => {
@@ -4595,7 +4627,10 @@ if (window.ethereum) {
 
   window.addEventListener("focus", () => {
     syncWalletState().then((connected) => {
-      if (connected) renderApp();
+      if (connected) {
+        renderApp();
+        refreshTestnetData(true);
+      }
     }).catch(() => {});
   });
 }
