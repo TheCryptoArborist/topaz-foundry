@@ -467,7 +467,7 @@ Review requirements:
 
 Before BNB mainnet:
 
-1. Deploy contracts to BNB testnet or a local fork.
+1. Deploy contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
 2. Run one successful fair launch.
 3. Run one failed/refunding fair launch.
 4. Run one guided setup fixed-price launch as admin-assisted.
@@ -483,6 +483,7 @@ Before BNB mainnet:
 - Choose Solidity toolchain. Status: Foundry-style layout selected.
 - Create contracts package. Status: initial `contracts/` scaffold added.
 - Add tests for sale vault and accounting. Status: Foundry tests added for refunds, successful finalization, 2% fee accounting, hard cap, wallet min/max, guided setup restrictions, double refund/claim/finalization rejection, LP fee split, vesting, and incentive escrow.
+- Add deployment-prep script and checklist. Status: started with dry-run script and required-value checklist.
 
 ### Phase 2: Backend/Admin
 
@@ -540,5 +541,6 @@ The current frontend prototype already represents:
 - Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
 - Foundry test suite for refund, finalization accounting, quote-token allowlist enforcement, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
 - Local BNB Chain fork dry run against the live Topaz V2 router/factory passed for pool creation, liquidity add, and LP minting.
+- Deployment-prep script and checklist for local/testnet rehearsal.
 
-The next engineering step is to choose the MVP quote asset policy and prepare testnet deployment scripts, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.
+The next engineering step is to choose the first rehearsal environment, then run the deployment script as a dry run before expanding edge-case tests around sale windows, cancellation, LP unlocks, and rounding.

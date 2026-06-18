@@ -25,6 +25,7 @@ Included support files:
 - `ArborFoundryTypes.sol` - shared enums and structs.
 - `interfaces/` - minimal ERC20 and Topaz V2 interfaces.
 - `lib/` - minimal ownership, re-entry guard, and ERC20 transfer helpers.
+- `script/DeployArborFoundryMvp.s.sol` - deployment-prep script for dry runs and future broadcast.
 - `test/ArborFoundryMvp.t.sol` - first Foundry test suite with local mock ERC20 and Topaz V2 contracts.
 
 First-pass tests cover:
@@ -53,7 +54,7 @@ Before mainnet:
 1. Install Foundry.
 2. Expand unit tests for sale windows, cancellation, treasury/finalizer admin changes, LP unlock restrictions, and edge-case rounding.
 3. Reconfirm Topaz V2 ABIs against the live BNB Chain contracts immediately before deployment. Current MVP interface confirmation is in `../docs/topaz-v2-abi-confirmation.md`.
-4. Run a BNB testnet or local fork dry run.
+4. Run a BNB testnet or local fork dry run using `../docs/testnet-deployment-checklist.md`.
 5. Get external security review before handling user funds.
 
 ## Suggested Commands
@@ -72,3 +73,11 @@ To repeat the Topaz live-router fork dry run:
 ```bash
 RUN_TOPAZ_FORK=true forge test --match-test testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp --fork-url https://bsc-dataseed.binance.org/ -vvv
 ```
+
+To dry-run the deployment script, first set the environment values from `../docs/testnet-deployment-checklist.md`, then run:
+
+```bash
+forge script script/DeployArborFoundryMvp.s.sol:DeployArborFoundryMvp --rpc-url "https://your-rpc-url"
+```
+
+Add `--broadcast` only after the dry run is reviewed and the target network values are final.
