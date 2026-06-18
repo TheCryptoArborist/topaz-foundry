@@ -468,13 +468,14 @@ Review requirements:
 Before BNB mainnet:
 
 1. Run the local BNB fork rehearsal from `docs/local-bnb-fork-rehearsal.md`.
-2. Deploy contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
-3. Run one successful fair launch.
-4. Run one failed/refunding fair launch.
-5. Run one guided setup fixed-price launch as admin-assisted.
-6. Run one guided setup liquidity bootstrap as admin-assisted.
-7. Verify accounting and proof page output.
-8. Confirm Topaz routing on the intended environment or mocked equivalent.
+2. Deploy rehearsal-only mock Topaz contracts to BNB testnet using `contracts/script/DeployMockTopazV2.s.sol` if no matching Topaz V2 testnet deployment is available.
+3. Deploy Arbor Foundry contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
+4. Run one successful fair launch.
+5. Run one failed/refunding fair launch.
+6. Run one guided setup fixed-price launch as admin-assisted.
+7. Run one guided setup liquidity bootstrap as admin-assisted.
+8. Verify accounting and proof page output.
+9. Confirm Topaz routing on the intended environment or mocked equivalent.
 
 ## 11. Deployment Plan
 
@@ -486,6 +487,7 @@ Before BNB mainnet:
 - Add tests for sale vault and accounting. Status: Foundry tests added for refunds, successful finalization, 2% fee accounting, hard cap, wallet min/max, guided setup restrictions, double refund/claim/finalization rejection, LP fee split, vesting, and incentive escrow.
 - Add deployment-prep script and checklist. Status: started with dry-run script and required-value checklist.
 - Add local BNB fork rehearsal helper. Status: started with PowerShell helper and rehearsal guide.
+- Add BNB testnet mock Topaz rehearsal layer. Status: started with mock factory/router/pair/ERC20 contracts, deploy script, and guide.
 
 ### Phase 2: Backend/Admin
 
@@ -545,5 +547,6 @@ The current frontend prototype already represents:
 - Local BNB Chain fork dry run against the live Topaz V2 router/factory passed for pool creation, liquidity add, and LP minting.
 - Deployment-prep script and checklist for local/testnet rehearsal.
 - Local BNB fork rehearsal helper for repeatable pre-testnet checks.
+- BNB testnet mock Topaz rehearsal layer for public testnet deployment practice.
 
-The next engineering step is to run the local BNB fork rehearsal, then prepare a BNB testnet rehearsal with mock Topaz contracts if no matching public Topaz V2 testnet deployment is available.
+The next engineering step is to run the BNB testnet mock Topaz rehearsal, then add an end-to-end scripted launch rehearsal for one success path and one refund path.

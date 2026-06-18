@@ -25,7 +25,9 @@ Included support files:
 - `ArborFoundryTypes.sol` - shared enums and structs.
 - `interfaces/` - minimal ERC20 and Topaz V2 interfaces.
 - `lib/` - minimal ownership, re-entry guard, and ERC20 transfer helpers.
+- `mocks/` - rehearsal-only Topaz V2 factory/router/pair and ERC20 mocks.
 - `script/DeployArborFoundryMvp.s.sol` - deployment-prep script for dry runs and future broadcast.
+- `script/DeployMockTopazV2.s.sol` - rehearsal-only mock Topaz deploy script for BNB testnet.
 - `test/ArborFoundryMvp.t.sol` - first Foundry test suite with local mock ERC20 and Topaz V2 contracts.
 
 First-pass tests cover:
@@ -88,3 +90,12 @@ forge script script/DeployArborFoundryMvp.s.sol:DeployArborFoundryMvp --rpc-url 
 ```
 
 Add `--broadcast` only after the dry run is reviewed and the target network values are final.
+
+To rehearse on BNB testnet with mock Topaz contracts, use:
+
+```powershell
+cd "C:\Users\peter\OneDrive\Documents\Topaz Dex\topaz-foundry-github"
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployMocks
+```
+
+See `../docs/bnb-testnet-mock-topaz-rehearsal.md` for the full dry-run and broadcast sequence.

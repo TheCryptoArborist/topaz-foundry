@@ -16,6 +16,8 @@ Testnet deployment checklist: `docs/testnet-deployment-checklist.md`
 
 Local BNB fork rehearsal: `docs/local-bnb-fork-rehearsal.md`
 
+BNB testnet mock Topaz rehearsal: `docs/bnb-testnet-mock-topaz-rehearsal.md`
+
 The prototype shows:
 
 - Launch list tabs for approved, live, upcoming, finalized, and refunding launches.

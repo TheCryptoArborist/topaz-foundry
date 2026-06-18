@@ -12,6 +12,8 @@ import { IERC20 } from "../src/interfaces/IERC20.sol";
 import { ITopazV2Factory } from "../src/interfaces/ITopazV2Factory.sol";
 import { ITopazV2Pair } from "../src/interfaces/ITopazV2Pair.sol";
 import { ITopazV2Router } from "../src/interfaces/ITopazV2Router.sol";
+import { MockTopazV2Factory } from "../src/mocks/MockTopazV2Factory.sol";
+import { MockTopazV2Router } from "../src/mocks/MockTopazV2Router.sol";
 
 contract ArborFoundryMvpTest {
     address private constant TOPAZ_ROUTER = 0x1E98c8226e7d452e1888e3d3d2F929346321c6c3;
@@ -226,6 +228,34 @@ contract ArborFoundryMvpTest {
                 )
             );
         _assertFalse(blocked);
+    }
+
+    function testReusableMockTopazLayerFinalizesLaunch() external {
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+        MockTopazV2Factory topazFactory = new MockTopazV2Factory();
+        MockTopazV2Router router = new MockTopazV2Router(address(topazFactory));
+        TopazFinalizer finalizer = new TopazFinalizer(address(this), address(topazFactory), address(router));
+        context.factory.setLaunchFinalizer(context.launch, address(finalizer));
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+        SaleVault(context.launch).deposit(1000 ether);
+
+        context.saleToken.approve(address(finalizer), 5000 ether);
+        (ArborFoundryTypes.LaunchAccounting memory accounting, address pair, uint256 liquidity) =
+            finalizer.finalizeLaunch(_finalizeParams(context, 5000 ether));
+
+        _assertEq(accounting.quoteToLiquidity, 588 ether);
+        _assertTrue(pair != address(0));
+        _assertTrue(liquidity != 0);
+        _assertEq(topazFactory.allPoolsLength(), 1);
+        _assertEq(
+            ITopazV2Factory(address(topazFactory))
+                .getPool(address(context.saleToken), address(context.quoteToken), false),
+            pair
+        );
+        _assertEq(IERC20(pair).balanceOf(context.lpReceiver), liquidity);
     }
 
     function testDoubleFinalizationIsRejected() external {

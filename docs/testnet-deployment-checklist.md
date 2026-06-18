@@ -18,6 +18,8 @@ If the target is a testnet and Topaz V2 does not have matching testnet contracts
 
 For the first local rehearsal, use `docs/local-bnb-fork-rehearsal.md`.
 
+For the first public testnet rehearsal, use `docs/bnb-testnet-mock-topaz-rehearsal.md` unless Topaz V2 has matching public BNB testnet contracts available.
+
 ## 2. Required Values
 
 The deployment script requires these values:
@@ -96,6 +98,8 @@ It also:
 - Starts ownership transfer to `ARBOR_OWNER` if it differs from the deployer.
 
 If `ARBOR_OWNER` is different from the deployer, that wallet must call `acceptOwnership()` on each deployed contract after deployment.
+
+For mock Topaz rehearsal, deploy the mock factory/router/USDT first with `contracts/script/DeployMockTopazV2.s.sol`, then use those addresses as `TOPAZ_FACTORY`, `TOPAZ_ROUTER`, and `USDT_QUOTE_TOKEN`.
 
 ## 5. Post-Deploy Checks
 
