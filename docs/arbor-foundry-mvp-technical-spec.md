@@ -467,13 +467,14 @@ Review requirements:
 
 Before BNB mainnet:
 
-1. Deploy contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
-2. Run one successful fair launch.
-3. Run one failed/refunding fair launch.
-4. Run one guided setup fixed-price launch as admin-assisted.
-5. Run one guided setup liquidity bootstrap as admin-assisted.
-6. Verify accounting and proof page output.
-7. Confirm Topaz routing on the intended environment or mocked equivalent.
+1. Run the local BNB fork rehearsal from `docs/local-bnb-fork-rehearsal.md`.
+2. Deploy contracts to BNB testnet or a local fork using `contracts/script/DeployArborFoundryMvp.s.sol` and `docs/testnet-deployment-checklist.md`.
+3. Run one successful fair launch.
+4. Run one failed/refunding fair launch.
+5. Run one guided setup fixed-price launch as admin-assisted.
+6. Run one guided setup liquidity bootstrap as admin-assisted.
+7. Verify accounting and proof page output.
+8. Confirm Topaz routing on the intended environment or mocked equivalent.
 
 ## 11. Deployment Plan
 
@@ -484,6 +485,7 @@ Before BNB mainnet:
 - Create contracts package. Status: initial `contracts/` scaffold added.
 - Add tests for sale vault and accounting. Status: Foundry tests added for refunds, successful finalization, 2% fee accounting, hard cap, wallet min/max, guided setup restrictions, double refund/claim/finalization rejection, LP fee split, vesting, and incentive escrow.
 - Add deployment-prep script and checklist. Status: started with dry-run script and required-value checklist.
+- Add local BNB fork rehearsal helper. Status: started with PowerShell helper and rehearsal guide.
 
 ### Phase 2: Backend/Admin
 
@@ -542,5 +544,6 @@ The current frontend prototype already represents:
 - Foundry test suite for refund, finalization accounting, quote-token allowlist enforcement, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
 - Local BNB Chain fork dry run against the live Topaz V2 router/factory passed for pool creation, liquidity add, and LP minting.
 - Deployment-prep script and checklist for local/testnet rehearsal.
+- Local BNB fork rehearsal helper for repeatable pre-testnet checks.
 
-The next engineering step is to choose the first rehearsal environment, then run the deployment script as a dry run before expanding edge-case tests around sale windows, cancellation, LP unlocks, and rounding.
+The next engineering step is to run the local BNB fork rehearsal, then prepare a BNB testnet rehearsal with mock Topaz contracts if no matching public Topaz V2 testnet deployment is available.

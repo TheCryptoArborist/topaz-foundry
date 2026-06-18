@@ -74,6 +74,13 @@ To repeat the Topaz live-router fork dry run:
 RUN_TOPAZ_FORK=true forge test --match-test testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp --fork-url https://bsc-dataseed.binance.org/ -vvv
 ```
 
+On Windows PowerShell, the repeatable helper is:
+
+```powershell
+cd "C:\Users\peter\OneDrive\Documents\Topaz Dex\topaz-foundry-github"
+powershell.exe -ExecutionPolicy Bypass -File .\tools\run-local-bnb-fork-rehearsal.ps1
+```
+
 To dry-run the deployment script, first set the environment values from `../docs/testnet-deployment-checklist.md`, then run:
 
 ```bash

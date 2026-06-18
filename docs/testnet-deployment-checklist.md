@@ -16,6 +16,8 @@ Pick one deployment target before broadcasting:
 
 If the target is a testnet and Topaz V2 does not have matching testnet contracts, do not reuse BNB mainnet Topaz addresses. Deploy or select mock router/factory contracts for the rehearsal.
 
+For the first local rehearsal, use `docs/local-bnb-fork-rehearsal.md`.
+
 ## 2. Required Values
 
 The deployment script requires these values:

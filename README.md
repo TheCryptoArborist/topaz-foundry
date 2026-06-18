@@ -14,6 +14,8 @@ Topaz V2 ABI confirmation: `docs/topaz-v2-abi-confirmation.md`
 
 Testnet deployment checklist: `docs/testnet-deployment-checklist.md`
 
+Local BNB fork rehearsal: `docs/local-bnb-fork-rehearsal.md`
+
 The prototype shows:
 
 - Launch list tabs for approved, live, upcoming, finalized, and refunding launches.
