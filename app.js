@@ -1755,8 +1755,11 @@ function resumeTestnetLaunch(launchAddress) {
   state.wizardForm.tokenLogo = savedLogo;
   state.wizardForm.tokenLogoDataUrl = savedLogo;
   state.wizardForm.tokenLogoName = savedLogo ? state.wizardForm.tokenLogoName : "";
+  const finalizable = testnetLaunchFinalizable(launch);
   state.testnetLaunchTx = {
-    status: `Resumed ${launch.statusLabel} SaleVault. Next: ${testnetLaunchNextAction(launch)}.`,
+    status: finalizable
+      ? "Loaded a soft-cap-met SaleVault. Next: approve LP tokens, then finalize the launch."
+      : `Loaded ${launch.statusLabel} SaleVault. Next: ${testnetLaunchNextAction(launch)}.`,
     hash: "",
     launchAddress: launch.address,
     error: "",
@@ -1764,7 +1767,12 @@ function resumeTestnetLaunch(launchAddress) {
   state.finalizationTx = { status: "", hash: "", pair: "", error: "" };
   state.wizardStep = wizardSteps.length - 1;
   renderApp();
-  showToast(`Resumed ${shortAddress(launch.address)}.`);
+  window.setTimeout(() => {
+    document
+      .getElementById(finalizable ? "testnet-finalization-panel" : "testnet-launch-writer")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 0);
+  showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : `Loaded ${shortAddress(launch.address)}.`);
 }
 
 async function readLaunchFactory() {
@@ -3398,7 +3406,7 @@ function testnetLaunchRows() {
     resumableTestnetLaunch(launch)
       ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
       : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">${
-          testnetLaunchFinalizable(launch) ? "Finalize" : launch.statusLabel === "Finalized" ? "View proof" : "Set logo"
+          testnetLaunchFinalizable(launch) ? "Load finalization" : launch.statusLabel === "Finalized" ? "View proof" : "Set logo"
         }</button>`,
   ]);
 }
@@ -4313,7 +4321,7 @@ function renderTestnetFinalizationPanel(launch) {
   }
 
   return `
-    <div class="finalization-box">
+    <div class="finalization-box" id="testnet-finalization-panel">
       <div class="panel-title">
         <h3>Finalize This Test Launch</h3>
         <span class="status ${testnetSoftCapMet(launch) ? "ready" : "upcoming"}">${testnetSoftCapMet(launch) ? "Soft cap met" : "Waiting for soft cap"}</span>
@@ -4321,6 +4329,10 @@ function renderTestnetFinalizationPanel(launch) {
       <div class="assist-note">
         <strong>What finalization does</strong>
         <span>It closes the SaleVault, sends the 2% success fee to Arbor Foundry, routes the liquidity share into the Topaz V2 pair, sends creator proceeds, and opens the post-launch proof path.</span>
+      </div>
+      <div class="assist-note">
+        <strong>Next on-chain steps</strong>
+        <span>First approve the project tokens that will pair with USDT in the Topaz LP. Then click Finalize Launch to send the finalization transaction.</span>
       </div>
       <div class="review-list">
         <div class="review-row"><span>Total raised</span><strong>${formatUnits(launch.totalRaised)} USDT</strong></div>
@@ -4340,8 +4352,8 @@ function renderTestnetFinalizationPanel(launch) {
         ${state.finalizationTx.hash ? `<br><a href="${explorerTxLink(state.finalizationTx.hash)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
       </div>
       <div class="tx-actions finalization-actions">
-        <button class="button" type="button" data-action="approve-finalizer-tokens" ${finalizationReady ? "" : "disabled"}>Approve LP Tokens</button>
-        <button class="button primary" type="button" data-action="finalize-testnet-launch" ${finalizationReady ? "" : "disabled"}>Finalize Launch</button>
+        <button class="button" type="button" data-action="approve-finalizer-tokens" ${finalizationReady ? "" : "disabled"}>1. Approve LP Tokens</button>
+        <button class="button primary" type="button" data-action="finalize-testnet-launch" ${finalizationReady ? "" : "disabled"}>2. Finalize Launch</button>
       </div>
     </div>
   `;
@@ -4369,7 +4381,7 @@ function renderTestnetLaunchWriter() {
     : "Created after confirmation";
 
   return `
-    <div class="testnet-writer">
+    <div class="testnet-writer" id="testnet-launch-writer">
       <div class="panel-title">
         <h3>${hasLaunch ? "Continue Testnet Launch" : "BNB Testnet Transaction"}</h3>
         <span class="micro">${hasLaunch ? "Selected SaleVault" : "Admin MVP path"}</span>
