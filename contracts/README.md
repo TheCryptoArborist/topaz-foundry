@@ -31,6 +31,12 @@ First-pass tests cover:
 
 - Failed fair launch refund path with 0 platform fee.
 - Successful fair launch finalization with 2% platform fee, net raise, Topaz liquidity amount, creator proceeds, LP minting, and buyer token claim.
+- Double-refund rejection.
+- Double-token-claim rejection.
+- Hard-cap enforcement.
+- Wallet min/max enforcement.
+- Guided setup sale modes blocked from the self-serve deposit path.
+- Double-finalization rejection.
 - 80/20 non-gauged LP fee split.
 - Incentive escrow overfunding protection and release.
 - Basic vesting claim release.
@@ -44,7 +50,7 @@ The base `SaleVault` is built around the self-serve Fair Launch path. Fixed-pric
 Before mainnet:
 
 1. Install Foundry.
-2. Expand unit tests for caps, double-claim protection, double-refund protection, double-finalization protection, and guided setup restrictions.
+2. Expand unit tests for sale windows, cancellation, treasury/finalizer admin changes, LP unlock restrictions, and edge-case rounding.
 3. Confirm Topaz V2 ABIs against the live BNB Chain contracts.
 4. Run a BNB testnet or local fork dry run.
 5. Get external security review before handling user funds.

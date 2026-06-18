@@ -75,6 +75,126 @@ contract ArborFoundryMvpTest {
         _assertEq(context.saleToken.balanceOf(address(this)), beforeClaim + 10_000 ether);
     }
 
+    function testDoubleRefundIsRejected() external {
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 500 ether);
+        SaleVault(context.launch).deposit(500 ether);
+
+        context.factory.enableRefunds(context.launch);
+        SaleVault(context.launch).claimRefund();
+
+        (bool refundedAgain,) = context.launch.call(abi.encodeCall(SaleVault.claimRefund, ()));
+        _assertFalse(refundedAgain);
+    }
+
+    function testDoubleTokenClaimIsRejected() external {
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+        TopazFinalizer finalizer = _attachFinalizer(context);
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+        SaleVault(context.launch).deposit(1000 ether);
+
+        TopazFinalizer.FinalizeParams memory params = _finalizeParams(context, 5000 ether);
+        context.saleToken.approve(address(finalizer), 5000 ether);
+        finalizer.finalizeLaunch(params);
+
+        SaleVault(context.launch).claimTokens();
+
+        (bool claimedAgain,) = context.launch.call(abi.encodeCall(SaleVault.claimTokens, ()));
+        _assertFalse(claimedAgain);
+    }
+
+    function testHardCapIsEnforced() external {
+        TestContext memory context = _createLaunchContextWithTerms({
+            softCap: 500 ether,
+            hardCap: 1000 ether,
+            saleTokenAmount: 10_000 ether,
+            liquidityBps: 6000,
+            walletMin: 1 ether,
+            walletMax: 2000 ether,
+            saleType: ArborFoundryTypes.SaleType.FairLaunch,
+            setupMode: ArborFoundryTypes.SetupMode.SelfServe
+        });
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 2000 ether);
+        SaleVault(context.launch).deposit(900 ether);
+
+        (bool overHardCap,) = context.launch.call(abi.encodeCall(SaleVault.deposit, (200 ether)));
+        _assertFalse(overHardCap);
+        _assertEq(SaleVault(context.launch).totalRaised(), 900 ether);
+    }
+
+    function testWalletMinAndMaxAreEnforced() external {
+        TestContext memory context = _createLaunchContextWithTerms({
+            softCap: 500 ether,
+            hardCap: 1000 ether,
+            saleTokenAmount: 10_000 ether,
+            liquidityBps: 6000,
+            walletMin: 100 ether,
+            walletMax: 300 ether,
+            saleType: ArborFoundryTypes.SaleType.FairLaunch,
+            setupMode: ArborFoundryTypes.SetupMode.SelfServe
+        });
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+
+        (bool belowMin,) = context.launch.call(abi.encodeCall(SaleVault.deposit, (50 ether)));
+        _assertFalse(belowMin);
+
+        SaleVault(context.launch).deposit(200 ether);
+
+        (bool aboveMax,) = context.launch.call(abi.encodeCall(SaleVault.deposit, (150 ether)));
+        _assertFalse(aboveMax);
+        _assertEq(SaleVault(context.launch).totalRaised(), 200 ether);
+    }
+
+    function testGuidedSetupSaleCannotUseSelfServeDepositPath() external {
+        TestContext memory context = _createLaunchContextWithTerms({
+            softCap: 500 ether,
+            hardCap: 1000 ether,
+            saleTokenAmount: 10_000 ether,
+            liquidityBps: 6000,
+            walletMin: 1 ether,
+            walletMax: 1000 ether,
+            saleType: ArborFoundryTypes.SaleType.FixedPrice,
+            setupMode: ArborFoundryTypes.SetupMode.GuidedSetup
+        });
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 100 ether);
+
+        (bool usedSelfServeDeposit,) = context.launch.call(abi.encodeCall(SaleVault.deposit, (100 ether)));
+        _assertFalse(usedSelfServeDeposit);
+        _assertEq(SaleVault(context.launch).totalRaised(), 0);
+    }
+
+    function testDoubleFinalizationIsRejected() external {
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+        TopazFinalizer finalizer = _attachFinalizer(context);
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+        SaleVault(context.launch).deposit(1000 ether);
+
+        TopazFinalizer.FinalizeParams memory params = _finalizeParams(context, 5000 ether);
+        context.saleToken.approve(address(finalizer), 5000 ether);
+        finalizer.finalizeLaunch(params);
+
+        (bool finalizedAgain,) = address(finalizer).call(abi.encodeCall(TopazFinalizer.finalizeLaunch, (params)));
+        _assertFalse(finalizedAgain);
+    }
+
     function testLPLockerSplitsClaimedFeesEightyTwenty() external {
         MockERC20 token0 = new MockERC20("Fee Token 0", "FEE0", 18);
         MockERC20 token1 = new MockERC20("Fee Token 1", "FEE1", 18);
@@ -135,6 +255,28 @@ contract ArborFoundryMvpTest {
         internal
         returns (TestContext memory context)
     {
+        context = _createLaunchContextWithTerms({
+            softCap: softCap,
+            hardCap: hardCap,
+            saleTokenAmount: saleTokenAmount,
+            liquidityBps: liquidityBps,
+            walletMin: 1 ether,
+            walletMax: hardCap,
+            saleType: ArborFoundryTypes.SaleType.FairLaunch,
+            setupMode: ArborFoundryTypes.SetupMode.SelfServe
+        });
+    }
+
+    function _createLaunchContextWithTerms(
+        uint256 softCap,
+        uint256 hardCap,
+        uint256 saleTokenAmount,
+        uint16 liquidityBps,
+        uint256 walletMin,
+        uint256 walletMax,
+        ArborFoundryTypes.SaleType saleType,
+        ArborFoundryTypes.SetupMode setupMode
+    ) internal returns (TestContext memory context) {
         context.saleToken = new MockERC20("Launch Token", "LAUNCH", 18);
         context.quoteToken = new MockERC20("Quote Token", "QUOTE", 18);
         context.platformTreasury = address(0xF011);
@@ -150,13 +292,13 @@ contract ArborFoundryMvpTest {
             creator: address(this),
             saleToken: address(context.saleToken),
             quoteToken: address(context.quoteToken),
-            saleType: ArborFoundryTypes.SaleType.FairLaunch,
-            setupMode: ArborFoundryTypes.SetupMode.SelfServe,
+            saleType: saleType,
+            setupMode: setupMode,
             saleTokenAmount: saleTokenAmount,
             softCap: softCap,
             hardCap: hardCap,
-            walletMin: 1 ether,
-            walletMax: hardCap,
+            walletMin: walletMin,
+            walletMax: walletMax,
             startsAt: 0,
             endsAt: 0,
             liquidityBps: liquidityBps,
@@ -164,6 +306,31 @@ contract ArborFoundryMvpTest {
         });
 
         context.launch = context.factory.createLaunch(config);
+    }
+
+    function _attachFinalizer(TestContext memory context) internal returns (TopazFinalizer finalizer) {
+        MockTopazFactory topazFactory = new MockTopazFactory();
+        MockTopazRouter router = new MockTopazRouter(topazFactory);
+        finalizer = new TopazFinalizer(address(this), address(topazFactory), address(router));
+        context.factory.setLaunchFinalizer(context.launch, address(finalizer));
+    }
+
+    function _finalizeParams(TestContext memory context, uint256 tokenAmountDesired)
+        internal
+        pure
+        returns (TopazFinalizer.FinalizeParams memory params)
+    {
+        params = TopazFinalizer.FinalizeParams({
+            launch: context.launch,
+            token: address(context.saleToken),
+            quoteToken: address(context.quoteToken),
+            creatorProceedsReceiver: context.creatorProceedsReceiver,
+            lpReceiver: context.lpReceiver,
+            tokenAmountDesired: tokenAmountDesired,
+            tokenAmountMin: 1,
+            quoteAmountMin: 1,
+            deadline: type(uint256).max
+        });
     }
 
     function _fundAndOpen(TestContext memory context, uint256 startsAt, uint256 endsAt) internal {
