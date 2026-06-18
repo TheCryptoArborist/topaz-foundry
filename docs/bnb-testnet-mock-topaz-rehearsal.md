@@ -28,7 +28,7 @@ You need:
 
 - A dedicated testnet deployer wallet.
 - Test BNB in that wallet.
-- The deployer private key stored only in your local terminal environment.
+- The deployer private key stored only in your local terminal environment before broadcasting.
 - An owner/admin wallet for `ARBOR_OWNER`.
 - The platform treasury address.
 
@@ -40,17 +40,17 @@ From PowerShell:
 
 ```powershell
 cd "C:\Users\peter\OneDrive\Documents\Topaz Dex\topaz-foundry-github"
-$env:DEPLOYER_PRIVATE_KEY="keep_this_private"
 powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployMocks
 ```
 
-This compiles, runs tests, and simulates deploying the mock Topaz layer. It does not broadcast.
+This compiles, runs tests, and simulates deploying the mock Topaz layer. It does not broadcast. If `DEPLOYER_PRIVATE_KEY` is not set, the helper uses a public dummy key for the dry run.
 
 ## 2. Broadcast Mock Topaz Deployment
 
 After the dry run looks right:
 
 ```powershell
+$env:DEPLOYER_PRIVATE_KEY="keep_this_private"
 powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployMocks -Broadcast
 ```
 
@@ -75,7 +75,7 @@ $env:TOPAZ_ROUTER="0xMockTopazRouterFromStep2"
 powershell.exe -ExecutionPolicy Bypass -File .\tools\run-bnb-testnet-mock-topaz-rehearsal.ps1 -DeployArbor
 ```
 
-This simulates the Arbor Foundry deployment using the mock Topaz layer. It does not broadcast.
+This simulates the Arbor Foundry deployment using the mock Topaz layer. It does not broadcast. If `DEPLOYER_PRIVATE_KEY` is not set, the helper uses a public dummy key for the dry run.
 
 ## 4. Broadcast Arbor Foundry Deployment
 

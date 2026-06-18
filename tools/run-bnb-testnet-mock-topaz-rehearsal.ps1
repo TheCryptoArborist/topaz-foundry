@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$DryRunPrivateKey = "1"
 
 function Resolve-Forge {
     $forgeCommand = Get-Command forge -ErrorAction SilentlyContinue
@@ -31,6 +32,27 @@ function Test-RequiredEnv {
     }
 }
 
+function Set-DryRunDeployerPrivateKey {
+    if ($Broadcast) {
+        Test-RequiredEnv @("DEPLOYER_PRIVATE_KEY")
+        return
+    }
+
+    if ([string]::IsNullOrWhiteSpace($env:DEPLOYER_PRIVATE_KEY)) {
+        $env:DEPLOYER_PRIVATE_KEY = $DryRunPrivateKey
+        Write-Host "Dry run: using a public dummy deployer key. Do not use this key for broadcast."
+    }
+}
+
+function Invoke-Forge {
+    param([string[]]$Arguments)
+
+    & $forge @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Forge command failed: forge $($Arguments -join ' ')"
+    }
+}
+
 function Invoke-ForgeScript {
     param([string[]]$Arguments)
 
@@ -38,7 +60,7 @@ function Invoke-ForgeScript {
         $Arguments += "--broadcast"
     }
 
-    & $forge @Arguments
+    Invoke-Forge -Arguments $Arguments
 }
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -55,11 +77,11 @@ try {
         Write-Host "Broadcast mode: OFF - dry run only"
     }
 
-    & $forge build
-    & $forge test
+    Invoke-Forge -Arguments @("build")
+    Invoke-Forge -Arguments @("test")
 
     if ($DeployMocks) {
-        Test-RequiredEnv @("DEPLOYER_PRIVATE_KEY")
+        Set-DryRunDeployerPrivateKey
         Invoke-ForgeScript -Arguments @(
             "script",
             "script/DeployMockTopazV2.s.sol:DeployMockTopazV2",
@@ -69,8 +91,8 @@ try {
     }
 
     if ($DeployArbor) {
+        Set-DryRunDeployerPrivateKey
         Test-RequiredEnv @(
-            "DEPLOYER_PRIVATE_KEY",
             "ARBOR_OWNER",
             "PLATFORM_TREASURY",
             "USDT_QUOTE_TOKEN",
