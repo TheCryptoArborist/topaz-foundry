@@ -228,6 +228,18 @@ button {
   background: rgba(242, 200, 75, 0.09);
 }
 
+.network-pill.action {
+  cursor: pointer;
+  font: inherit;
+}
+
+.network-pill.action:hover,
+.network-pill.action:focus-visible {
+  border-color: rgba(242, 200, 75, 0.7);
+  background: rgba(242, 200, 75, 0.16);
+  outline: none;
+}
+
 .network-pill.warn .dot {
   background: var(--gold);
   box-shadow: 0 0 14px rgba(242, 200, 75, 0.7);

@@ -742,14 +742,26 @@ function addressMatches(actual, expected) {
   return normalizeAddress(actual) === normalizeAddress(expected);
 }
 
+function numericChainId(chainId) {
+  if (!chainId) return null;
+  if (typeof chainId === "number") return chainId;
+  const value = String(chainId);
+  const radix = value.toLowerCase().startsWith("0x") ? 16 : 10;
+  const numeric = Number.parseInt(value, radix);
+  return Number.isNaN(numeric) ? null : numeric;
+}
+
 function chainIdLabel(chainId) {
-  if (!chainId) return "Not connected";
-  const numeric = Number.parseInt(chainId, 16);
-  return Number.isNaN(numeric) ? chainId : `${numeric}`;
+  const numeric = numericChainId(chainId);
+  return numeric === null ? "Not connected" : `${numeric}`;
 }
 
 function isWalletOnBnbTestnet() {
-  return normalizeAddress(state.walletChainId) === normalizeAddress(bnbTestnet.chainIdHex);
+  return numericChainId(state.walletChainId) === bnbTestnet.chainId;
+}
+
+function isWalletOnBnbMainnet() {
+  return numericChainId(state.walletChainId) === Number(topazV2.chainId);
 }
 
 function walletButtonLabel() {
@@ -761,6 +773,30 @@ function testnetNetworkLabel() {
   if (!state.connected) return "BNB Testnet 97";
   if (isWalletOnBnbTestnet()) return `BNB Testnet ${bnbTestnet.chainId}`;
   return `Wrong chain ${chainIdLabel(state.walletChainId)}`;
+}
+
+function topbarNetworkLabel() {
+  if (!state.connected) return `BNB Testnet ${bnbTestnet.chainId}`;
+  if (isWalletOnBnbTestnet()) return `BNB Testnet ${bnbTestnet.chainId}`;
+  if (isWalletOnBnbMainnet()) return "Switch to BNB Testnet";
+  return `Switch network ${chainIdLabel(state.walletChainId)}`;
+}
+
+async function syncWalletState(accountMethod = "eth_accounts") {
+  if (!window.ethereum) return false;
+  const accounts = await window.ethereum.request({ method: accountMethod });
+  state.connected = Boolean(accounts.length);
+  state.walletAddress = accounts[0] || "";
+
+  if (!state.connected) {
+    state.walletChainId = "";
+    state.walletStatus = "Not connected";
+    return false;
+  }
+
+  state.walletChainId = await window.ethereum.request({ method: "eth_chainId" });
+  state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+  return true;
 }
 
 function encodeUint256(value) {
@@ -911,12 +947,7 @@ async function connectWallet() {
   }
 
   try {
-    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-    const chainId = await window.ethereum.request({ method: "eth_chainId" });
-    state.connected = Boolean(accounts.length);
-    state.walletAddress = accounts[0] || "";
-    state.walletChainId = chainId;
-    state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+    await syncWalletState("eth_requestAccounts");
     renderApp();
     showToast(isWalletOnBnbTestnet() ? "Wallet connected to BNB testnet." : "Wallet connected. Switch to BNB testnet before transactions.");
     await refreshTestnetData(true);
@@ -957,8 +988,7 @@ async function switchToBnbTestnet() {
     });
   }
 
-  state.walletChainId = await window.ethereum.request({ method: "eth_chainId" });
-  state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
+  await syncWalletState();
   renderApp();
   await refreshTestnetData(true);
 }
@@ -1573,13 +1603,20 @@ function renderSidebar() {
 }
 
 function renderTopbar() {
+  const wrongChain = state.connected && !isWalletOnBnbTestnet();
+  const networkPill = wrongChain
+    ? `<button class="network-pill warn action" type="button" data-action="switch-testnet" title="Switch wallet to BNB Smart Chain Testnet">
+        <span class="dot"></span>${topbarNetworkLabel()}
+      </button>`
+    : `<div class="network-pill">
+        <span class="dot"></span>${topbarNetworkLabel()}
+      </div>`;
+
   return `
     <header class="topbar">
       <div class="tagline">Independent launches. Liquidity rooted on Topaz.</div>
       <div class="topbar-actions">
-        <div class="network-pill ${state.connected && !isWalletOnBnbTestnet() ? "warn" : ""}">
-          <span class="dot"></span>${testnetNetworkLabel()}
-        </div>
+        ${networkPill}
         <button class="button gold" type="button" data-action="open-wizard">${icons.plus} New launch</button>
         <button class="button primary" type="button" data-action="connect-wallet">
           ${icons.wallet}
@@ -3411,21 +3448,12 @@ renderApp();
 refreshTestnetData(true);
 
 if (window.ethereum) {
-  window.ethereum.request({ method: "eth_accounts" }).then((accounts) => {
-    if (!accounts.length) return;
-    state.connected = true;
-    state.walletAddress = accounts[0];
-    return window.ethereum.request({ method: "eth_chainId" }).then((chainId) => {
-      state.walletChainId = chainId;
-      state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
-      renderApp();
-    });
+  syncWalletState().then((connected) => {
+    if (connected) renderApp();
   }).catch(() => {});
 
-  window.ethereum.on?.("accountsChanged", (accounts) => {
-    state.connected = Boolean(accounts.length);
-    state.walletAddress = accounts[0] || "";
-    state.walletStatus = state.connected ? state.walletStatus : "Not connected";
+  window.ethereum.on?.("accountsChanged", async () => {
+    await syncWalletState().catch(() => {});
     renderApp();
   });
 
@@ -3434,5 +3462,11 @@ if (window.ethereum) {
     state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
     renderApp();
     refreshTestnetData(true);
+  });
+
+  window.addEventListener("focus", () => {
+    syncWalletState().then((connected) => {
+      if (connected) renderApp();
+    }).catch(() => {});
   });
 }
