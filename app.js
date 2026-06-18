@@ -656,6 +656,8 @@ const contractSelectors = {
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
+  erc20Name: "0x06fdde03",
+  erc20Symbol: "0x95d89b41",
 };
 
 const launchStatusLabels = ["Draft", "Pending Review", "Approved", "Upcoming", "Live", "Finalized", "Refunding", "Cancelled"];
@@ -943,6 +945,27 @@ function decodeAddress(result, word = 0) {
   return value ? `0x${value}` : "";
 }
 
+function decodeAbiString(result) {
+  const clean = (result || "0x").replace(/^0x/, "");
+  if (!clean) return "";
+
+  try {
+    const offset = Number(decodeUint256(result, 0));
+    if (offset >= 32 && clean.length >= (offset + 32) * 2) {
+      const length = Number(BigInt(`0x${clean.slice(offset * 2, offset * 2 + 64) || "0"}`));
+      const hex = clean.slice((offset + 32) * 2, (offset + 32 + length) * 2);
+      const bytes = hex.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) || [];
+      return new TextDecoder().decode(new Uint8Array(bytes)).replace(/\0/g, "").trim();
+    }
+  } catch (error) {
+    // Fall back to bytes32-style decoding below.
+  }
+
+  const bytes32 = clean.slice(0, 64).replace(/(00)+$/, "");
+  const bytes = bytes32.match(/.{1,2}/g)?.map((byte) => Number.parseInt(byte, 16)) || [];
+  return new TextDecoder().decode(new Uint8Array(bytes)).replace(/\0/g, "").trim();
+}
+
 function formatUnits(value, decimals = 18, places = 2) {
   const amount = BigInt(value || 0);
   const divisor = 10n ** BigInt(decimals);
@@ -956,6 +979,11 @@ function formatUnits(value, decimals = 18, places = 2) {
 
 function formUnits(value, decimals = 18) {
   return formatUnits(value, decimals, 6).replace(/,/g, "");
+}
+
+function unitsToNumber(value, decimals = 18) {
+  const amount = Number(formUnits(value, decimals));
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function basisPointsToPercent(value) {
@@ -1288,6 +1316,25 @@ function decodeLaunchConfig(result) {
   };
 }
 
+async function readTokenMeta(address) {
+  const tokenMeta = { name: "", symbol: "" };
+  if (!isEvmAddress(address)) return tokenMeta;
+
+  try {
+    tokenMeta.name = decodeAbiString(await ethCall(address, contractSelectors.erc20Name));
+  } catch (error) {
+    tokenMeta.name = "";
+  }
+
+  try {
+    tokenMeta.symbol = decodeAbiString(await ethCall(address, contractSelectors.erc20Symbol));
+  } catch (error) {
+    tokenMeta.symbol = "";
+  }
+
+  return tokenMeta;
+}
+
 function testnetLaunchNextAction(launch) {
   if (!launch) return "Select a launch";
   if (launch.statusLabel === "Draft") {
@@ -1375,6 +1422,7 @@ async function readSaleVault(address, index) {
   const accounting = await ethCall(address, contractSelectors.previewAccounting);
   const config = decodeLaunchConfig(await ethCall(address, contractSelectors.config));
   const saleTokensFunded = decodeBool(await ethCall(address, contractSelectors.saleTokensFunded));
+  const tokenMeta = await readTokenMeta(config.saleToken);
   return {
     index,
     address,
@@ -1382,6 +1430,7 @@ async function readSaleVault(address, index) {
     statusLabel: launchStatusLabels[status] || `Status ${status}`,
     config,
     saleTokensFunded,
+    tokenMeta,
     totalRaised,
     platformFee: decodeUint256(accounting, 1),
     netRaise: decodeUint256(accounting, 2),
@@ -1400,6 +1449,7 @@ async function refreshTestnetData(silent = false) {
     const data = await readLaunchFactory();
     state.testnetData = data;
     state.testnetLastUpdated = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (state.view === "launchpad") ensureSelectedLaunchVisible(true);
   } catch (error) {
     state.testnetError = error.message || "Could not read BNB testnet contracts.";
   } finally {
@@ -2010,17 +2060,132 @@ function quoteAsset(launch) {
   return launch.quoteAsset || "USDT";
 }
 
+function statusKeyFromLabel(label) {
+  return String(label || "").toLowerCase().replace(/\s+/g, "-");
+}
+
 function pct(launch) {
   if (!launch.goal) return 0;
   return Math.min(100, Math.round((launch.raised / launch.goal) * 10000) / 100);
 }
 
+function testnetLaunchSymbol(launch) {
+  const symbol = launch.tokenMeta?.symbol?.trim();
+  return symbol || `T${launch.index + 1}`;
+}
+
+function testnetLaunchName(launch) {
+  const name = launch.tokenMeta?.name?.trim();
+  return name ? name.toUpperCase() : `TESTNET LAUNCH #${launch.index + 1}`;
+}
+
+function testnetLaunchesForLaunchpad() {
+  const colors = ["#36e6b6", "#83e36e", "#62d8ff", "#b9a7ff", "#f2c84b"];
+  return (state.testnetData.launches || []).map((launch) => {
+    const config = launch.config || {};
+    const status = statusKeyFromLabel(launch.statusLabel);
+    const symbol = testnetLaunchSymbol(launch);
+    const hardCap = unitsToNumber(config.hardCap);
+    const softCap = unitsToNumber(config.softCap);
+    const raised = unitsToNumber(launch.totalRaised);
+    const liquidityPercent = Number(basisPointsToPercent(config.liquidityBps || 0)) || 0;
+    const vault = launch.address;
+    const token = config.saleToken || "";
+    const summary =
+      status === "live"
+        ? "This real BNB testnet SaleVault is open and accepting mock USDT deposits for the rehearsal launch."
+        : "This real BNB testnet SaleVault is visible from the LaunchFactory and can be inspected before buyer deposits open.";
+
+    return {
+      id: `testnet-${launch.index}`,
+      name: testnetLaunchName(launch),
+      symbol,
+      status,
+      color: colors[launch.index % colors.length],
+      raised,
+      goal: hardCap,
+      softCap,
+      saleType: saleTypeLabel(config.saleType || 0),
+      quoteAsset: "USDT",
+      price: "Pro rata allocation",
+      hardCap: `${formatUnits(config.hardCap || 0n)} USDT`,
+      endsIn: status === "live" ? "Deposits open" : launch.statusLabel,
+      summary,
+      tags: ["BNB Testnet", "On-chain", `SaleVault ${shortAddress(vault)}`],
+      min: unitsToNumber(config.walletMin),
+      max: unitsToNumber(config.walletMax),
+      contributors: raised > 0 ? 1 : 0,
+      avgContribution: raised,
+      yourContribution: 0,
+      vesting: [
+        ["TGE", "Configured", "After finalization"],
+        ["Claims", "Pro rata", "When finalized"],
+      ],
+      incentives: [
+        ["Incentives", "Optional", "After launch"],
+        ["Topaz proof", "Queued", "After finalization"],
+      ],
+      proof: {
+        lockDuration: "Queued after successful close",
+        liquidity: `${liquidityPercent}% of net raise`,
+        poolType: "V2 volatile, stable=false",
+        feeMode: platformEconomics.lpFeeSplit,
+        lockTx: `SaleVault ${shortAddress(vault)}`,
+        vesting: "Configured in launch setup",
+        cliff: "Public at claim setup",
+        incentives: "Optional",
+        distributor: "After finalization",
+        start: status === "live" ? "Open now on BNB testnet" : launch.statusLabel,
+      },
+      risk: ["BNB testnet rehearsal", "Mock USDT only", "Topaz pair is created only after successful finalization"],
+      post: {
+        marketCap: "Testnet",
+        fdv: `${formatUnits(config.saleTokenAmount || 0n)} ${symbol}`,
+        liquidity: `${liquidityPercent}% target`,
+        holders: "Rehearsal",
+      },
+      social: {
+        enabled: true,
+        channels: ["X", "Telegram"],
+        hashtag: "#ArborFoundryTestnet",
+        creatorHandle: "@ArborFoundry",
+        cadence: "Open, soft cap, finalization",
+      },
+      testnet: {
+        vault,
+        token,
+        index: launch.index,
+        saleTokensFunded: launch.saleTokensFunded,
+      },
+    };
+  });
+}
+
+function launchpadLaunches() {
+  return [...testnetLaunchesForLaunchpad(), ...launches];
+}
+
+function ensureSelectedLaunchVisible(preferTestnet = false) {
+  const availableLaunches = launchpadLaunches();
+  const rows = availableLaunches.filter((launch) => launch.status === state.tab);
+  if (!rows.length) return;
+
+  const selected = availableLaunches.find((launch) => launch.id === state.selectedId);
+  const selectedIsVisible = selected?.status === state.tab;
+  const selectedIsDemo = selected && !selected.testnet;
+  const testnetRow = rows.find((launch) => launch.testnet);
+
+  if (!selectedIsVisible || (preferTestnet && selectedIsDemo && testnetRow)) {
+    state.selectedId = (preferTestnet && testnetRow ? testnetRow : rows[0]).id;
+  }
+}
+
 function currentLaunch() {
-  return launches.find((launch) => launch.id === state.selectedId) || launches[0];
+  return launchpadLaunches().find((launch) => launch.id === state.selectedId) || launchpadLaunches()[0] || launches[0];
 }
 
 function filteredLaunches() {
-  return launches.filter((launch) => launch.status === state.tab);
+  return launchpadLaunches().filter((launch) => launch.status === state.tab);
 }
 
 function renderLogo(size = "small") {
@@ -2101,8 +2266,9 @@ function renderTopbar() {
 }
 
 function renderTabs() {
+  const allLaunches = launchpadLaunches();
   const counts = tabs.reduce((acc, [key]) => {
-    acc[key] = launches.filter((launch) => launch.status === key).length;
+    acc[key] = allLaunches.filter((launch) => launch.status === key).length;
     return acc;
   }, {});
 
@@ -3943,6 +4109,7 @@ async function handleClick(event) {
   const view = target.dataset.view;
   if (view) {
     state.view = view;
+    if (view === "launchpad") ensureSelectedLaunchVisible(true);
     renderApp();
     return;
   }
@@ -3950,8 +4117,7 @@ async function handleClick(event) {
   const tab = target.dataset.tab;
   if (tab) {
     state.tab = tab;
-    const first = launches.find((launch) => launch.status === tab);
-    if (first) state.selectedId = first.id;
+    ensureSelectedLaunchVisible(true);
     renderApp();
     return;
   }
