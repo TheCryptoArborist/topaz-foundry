@@ -538,5 +538,6 @@ The current frontend prototype already represents:
 - Admin/private accounting concept.
 - Initial Solidity scaffold in `contracts/` for factory, fair-launch vault, Topaz finalizer, LP fee-split locker, vesting, and incentive tracking.
 - Foundry test suite for refund, finalization accounting, cap enforcement, guided setup restrictions, double action rejection, LP fee split, vesting, and incentive escrow paths.
+- Local BNB Chain fork dry run against the live Topaz V2 router/factory passed for pool creation, liquidity add, and LP minting.
 
-The next engineering step is a local fork dry run against the live Topaz V2 router/factory, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.
+The next engineering step is to choose the MVP quote asset policy and prepare testnet deployment scripts, while continuing to add edge-case tests around sale windows, cancellation, LP unlocks, and rounding.

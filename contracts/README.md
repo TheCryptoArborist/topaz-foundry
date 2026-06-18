@@ -65,3 +65,9 @@ forge fmt
 forge build
 forge test
 ```
+
+To repeat the Topaz live-router fork dry run:
+
+```bash
+RUN_TOPAZ_FORK=true forge test --match-test testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp --fork-url https://bsc-dataseed.binance.org/ -vvv
+```

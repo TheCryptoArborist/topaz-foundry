@@ -10,9 +10,14 @@ import { TopazFinalizer } from "../src/TopazFinalizer.sol";
 import { VestingVault } from "../src/VestingVault.sol";
 import { IERC20 } from "../src/interfaces/IERC20.sol";
 import { ITopazV2Factory } from "../src/interfaces/ITopazV2Factory.sol";
+import { ITopazV2Pair } from "../src/interfaces/ITopazV2Pair.sol";
 import { ITopazV2Router } from "../src/interfaces/ITopazV2Router.sol";
 
 contract ArborFoundryMvpTest {
+    address private constant TOPAZ_ROUTER = 0x1E98c8226e7d452e1888e3d3d2F929346321c6c3;
+    address private constant TOPAZ_FACTORY = 0x65E6cD0eF5D3467030103cf3d433034E570b5784;
+    Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
     function testFairLaunchRefundsWhenSoftCapMissed() external {
         TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
 
@@ -251,6 +256,54 @@ contract ArborFoundryMvpTest {
         _assertEq(vestingToken.balanceOf(address(this)), beforeClaim + 100 ether);
     }
 
+    function testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp() external {
+        if (!_runTopazForkTests()) return;
+        _assertTrue(TOPAZ_ROUTER.code.length != 0);
+        _assertTrue(TOPAZ_FACTORY.code.length != 0);
+
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+        TopazFinalizer finalizer = new TopazFinalizer(address(this), TOPAZ_FACTORY, TOPAZ_ROUTER);
+        context.factory.setLaunchFinalizer(context.launch, address(finalizer));
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+        SaleVault(context.launch).deposit(1000 ether);
+
+        (uint256 quotedToken, uint256 quotedQuote, uint256 quotedLiquidity) = ITopazV2Router(TOPAZ_ROUTER)
+            .quoteAddLiquidity(
+                address(context.saleToken), address(context.quoteToken), false, TOPAZ_FACTORY, 5000 ether, 588 ether
+            );
+
+        _assertTrue(quotedToken != 0);
+        _assertTrue(quotedQuote != 0);
+        _assertTrue(quotedLiquidity != 0);
+
+        context.saleToken.approve(address(finalizer), 5000 ether);
+        (ArborFoundryTypes.LaunchAccounting memory accounting, address pair, uint256 liquidity) =
+            finalizer.finalizeLaunch(_finalizeParams(context, 5000 ether));
+
+        _assertEq(accounting.quoteToLiquidity, 588 ether);
+        _assertTrue(pair != address(0));
+        _assertTrue(liquidity != 0);
+        _assertEq(
+            ITopazV2Factory(TOPAZ_FACTORY).getPool(address(context.saleToken), address(context.quoteToken), false), pair
+        );
+        _assertEq(
+            ITopazV2Pair(pair).token0(),
+            address(context.saleToken) < address(context.quoteToken)
+                ? address(context.saleToken)
+                : address(context.quoteToken)
+        );
+        _assertEq(
+            ITopazV2Pair(pair).token1(),
+            address(context.saleToken) < address(context.quoteToken)
+                ? address(context.quoteToken)
+                : address(context.saleToken)
+        );
+        _assertTrue(IERC20(pair).balanceOf(context.lpReceiver) != 0);
+    }
+
     function _createLaunchContext(uint256 softCap, uint256 hardCap, uint256 saleTokenAmount, uint16 liquidityBps)
         internal
         returns (TestContext memory context)
@@ -345,9 +398,29 @@ contract ArborFoundryMvpTest {
         require(actual == expected, "uint mismatch");
     }
 
+    function _assertEq(address actual, address expected) internal pure {
+        require(actual == expected, "address mismatch");
+    }
+
+    function _assertTrue(bool value) internal pure {
+        require(value, "expected true");
+    }
+
     function _assertFalse(bool value) internal pure {
         require(!value, "expected false");
     }
+
+    function _runTopazForkTests() internal returns (bool shouldRun) {
+        try vm.envBool("RUN_TOPAZ_FORK") returns (bool value) {
+            return value;
+        } catch {
+            return false;
+        }
+    }
+}
+
+interface Vm {
+    function envBool(string calldata name) external returns (bool value);
 }
 
 struct TestContext {

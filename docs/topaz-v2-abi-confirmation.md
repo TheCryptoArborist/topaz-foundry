@@ -83,7 +83,33 @@ This supports the MVP assumption that Topaz V2 volatile pools are fungible ERC20
 
 ## Remaining Before Testnet
 
-- Run a local fork dry run against BNB Chain with the live router and factory.
 - Confirm exact quote asset list for MVP: WBNB, USDT, or both.
 - Decide whether finalization should call `quoteAddLiquidity` before `addLiquidity`, or rely on an off-chain/admin quote with explicit min amounts.
 - Keep gauge/bribe automation manual until Topaz voter/reward interfaces are checked separately.
+
+## Local Fork Dry Run
+
+Status: passed on June 18, 2026.
+
+Command:
+
+```bash
+RUN_TOPAZ_FORK=true forge test \
+  --match-test testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp \
+  --fork-url https://bsc-dataseed.binance.org/ \
+  -vvv
+```
+
+Result:
+
+```text
+[PASS] testForkTopazFinalizerCreatesPoolAndMintsLiveTopazLp()
+1 passed; 0 failed; 0 skipped
+```
+
+What it proved:
+
+- The Arbor Foundry `TopazFinalizer` can call the live Topaz V2 router/factory shape on a local BNB Chain fork.
+- The live Topaz factory can create a volatile `stable=false` pool for local test tokens.
+- The live Topaz router can add liquidity and mint fungible LP tokens to the configured LP receiver.
+- No real funds or live transactions were used; all state changes happened inside the local fork.
