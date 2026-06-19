@@ -1237,11 +1237,12 @@ function latestLog(logs) {
   }).at(-1) || null;
 }
 
-async function readEventLogs(filter, latestBlock) {
+async function readEventLogs(filter, latestBlock, fromBlock) {
   const latest = Number(latestBlock || await ethBlockNumber());
   const lookback = Number(bnbTestnet.proofLogLookbackBlocks || 0);
   const chunkSize = Math.max(1000, Number(bnbTestnet.proofLogChunkBlocks || 4000));
-  const fromStart = Math.max(0, latest - lookback);
+  const preferredFrom = fromBlock === undefined || fromBlock === null ? latest - lookback : Number(fromBlock);
+  const fromStart = Math.max(0, Math.min(preferredFrom, latest));
   const logs = [];
 
   for (let from = fromStart; from <= latest; from += chunkSize) {
@@ -1257,9 +1258,9 @@ async function readEventLogs(filter, latestBlock) {
   return logs;
 }
 
-async function safeReadEventLogs(filter, latestBlock) {
+async function safeReadEventLogs(filter, latestBlock, fromBlock) {
   try {
-    return { logs: await readEventLogs(filter, latestBlock), error: "" };
+    return { logs: await readEventLogs(filter, latestBlock, fromBlock), error: "" };
   } catch (error) {
     return { logs: [], error: error.message || "Could not read event logs." };
   }
@@ -2007,7 +2008,7 @@ function resumeTestnetLaunch(launchAddress) {
   showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : `Loaded ${shortAddress(launch.address)}.`);
 }
 
-async function readProofTrailForSaleVault(address, config, accounting, latestBlock) {
+async function readProofTrailForSaleVault(address, config, accounting, latestBlock, fromBlock) {
   const proof = {
     available: false,
     indexed: true,
@@ -2039,13 +2040,14 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
     eventTopics.refundClaimed,
   ];
   const [saleLogsResult, finalizerLogsResult] = await Promise.all([
-    safeReadEventLogs({ address, topics: [saleLogTopics] }, latestBlock),
+    safeReadEventLogs({ address, topics: [saleLogTopics] }, latestBlock, fromBlock),
     safeReadEventLogs(
       {
         address: bnbTestnet.contracts.topazFinalizer,
         topics: [eventTopics.launchFinalized, topicAddress(address)],
       },
       latestBlock,
+      fromBlock,
     ),
   ]);
 
@@ -2094,6 +2096,7 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
         topics: [eventTopics.lockRegistered, topicAddress(proof.pair)],
       },
       latestBlock,
+      fromBlock,
     );
     if (lockLogsResult.error) proof.logErrors.push(lockLogsResult.error);
     const lockLog = latestLog(lockLogsResult.logs);
@@ -2116,6 +2119,26 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
   return proof.available ? proof : null;
 }
 
+async function readLaunchCreationBlocks(launchAddresses, latestBlock) {
+  const wanted = new Set((launchAddresses || []).map((address) => normalizeAddress(address)));
+  if (!wanted.size) return {};
+
+  const result = await safeReadEventLogs(
+    {
+      address: bnbTestnet.contracts.launchFactory,
+      topics: [launchCreatedTopic],
+    },
+    latestBlock,
+  );
+  const blocks = {};
+  result.logs.forEach((log) => {
+    const launchAddress = addressFromTopic(log.topics?.[1]);
+    const key = normalizeAddress(launchAddress);
+    if (wanted.has(key)) blocks[key] = logNumber(log.blockNumber);
+  });
+  return blocks;
+}
+
 async function readLaunchFactory() {
   const factory = bnbTestnet.contracts.launchFactory;
   const owner = decodeAddress(await ethCall(factory, contractSelectors.owner));
@@ -2135,9 +2158,24 @@ async function readLaunchFactory() {
 
   const launchesOnChain = [];
   const start = Math.max(0, launchCount - 5);
+  const launchRefs = [];
   for (let index = start; index < launchCount; index += 1) {
     const launchAddress = decodeAddress(await ethCall(factory, `${contractSelectors.allLaunches}${encodeUint256(index)}`));
-    launchesOnChain.push(await readSaleVault(launchAddress, index, latestBlock));
+    launchRefs.push({ index, address: launchAddress });
+  }
+  const creationBlocks = await readLaunchCreationBlocks(
+    launchRefs.map((launch) => launch.address),
+    latestBlock,
+  );
+  for (const launch of launchRefs) {
+    launchesOnChain.push(
+      await readSaleVault(
+        launch.address,
+        launch.index,
+        latestBlock,
+        creationBlocks[normalizeAddress(launch.address)],
+      ),
+    );
   }
 
   return {
@@ -2158,7 +2196,7 @@ async function readLaunchFactory() {
   };
 }
 
-async function readSaleVault(address, index, latestBlock = 0n) {
+async function readSaleVault(address, index, latestBlock = 0n, createdBlock = null) {
   const status = Number(decodeUint256(await ethCall(address, contractSelectors.status)));
   const totalRaised = decodeUint256(await ethCall(address, contractSelectors.totalRaised));
   const accounting = await ethCall(address, contractSelectors.previewAccounting);
@@ -2200,7 +2238,7 @@ async function readSaleVault(address, index, latestBlock = 0n) {
     }
   }
   const proofTrail =
-    status === 5 ? await readProofTrailForSaleVault(address, config, accountingData, latestBlock) : null;
+    status === 5 ? await readProofTrailForSaleVault(address, config, accountingData, latestBlock, createdBlock) : null;
 
   return {
     index,
@@ -3834,7 +3872,10 @@ function renderFinalizedProofTrail(launch) {
     : launch.claimableTokens > 0
       ? "Ready to claim"
       : "Claim path open";
-  const evidenceLabel = proof.indexed ? "Indexed proof" : "Saved proof";
+  const evidenceLabel = "Verified proof";
+  const proofSource = proof.indexed
+    ? "Indexed from BNB testnet event logs."
+    : "Linked to saved BNB testnet transactions and contracts.";
   const claimDetail = proof.claimTx
     ? `${proofQuantity(proof.claimAmount, launch.symbol)} to ${renderAddressLink(proof.claimWallet)}`
     : state.connected
@@ -3879,7 +3920,7 @@ function renderFinalizedProofTrail(launch) {
         <h3>Finalized Launch Proof Trail</h3>
         <span class="verified">${evidenceLabel}</span>
       </div>
-      <p class="muted">This is the permanent receipt buyers should see after a launch finishes: raise, fee split, Topaz liquidity, LP lock, and claim proof.</p>
+      <p class="muted">This is the permanent receipt buyers should see after a launch finishes: raise, fee split, Topaz liquidity, LP lock, and claim proof. ${proofSource}</p>
       ${proof.logErrors?.length ? `<div class="success-note show warn">Some proof logs were outside the current RPC window: ${escapeHtml(proof.logErrors[0])}</div>` : ""}
       ${renderDataTable(["Step", "Evidence", "Result", "State"], rows)}
     </section>
