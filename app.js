@@ -659,6 +659,8 @@ const bnbTestnet = {
   },
   expectedOwner: "0xE8b63245DdDAB73C7A276818942341D8Cfb7D7A7",
   platformTreasury: "0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE",
+  proofLogLookbackBlocks: 50000,
+  proofLogChunkBlocks: 4000,
 };
 
 const testnetProofRegistry = {
@@ -717,6 +719,14 @@ const contractSelectors = {
 
 const launchStatusLabels = ["Draft", "Pending Review", "Approved", "Upcoming", "Live", "Finalized", "Refunding", "Cancelled"];
 const launchCreatedTopic = "0x32ff3eb3c73f7308a7ef91e3ba79128db88ff8708afd5a04e393a305cc58fc98";
+const eventTopics = {
+  launchFinalized: "0xcbdf55e1c8573499927b3ee6ab98e7672fb8d13525c154d768914eddeaeb6651",
+  quoteReleasedForFinalization: "0x8676272ebef8c41b79c31a0782c2debe9477e570a28406db96fe92cca74f381d",
+  deposited: "0x2da466a7b24304f47e87fa2e1e5a81b9831ce54fec19055ce277ca2f39ba42c4",
+  tokensClaimed: "0x896e034966eaaf1adc54acc0f257056febbd300c9e47182cf761982cf1f5e430",
+  refundClaimed: "0x358fe4192934d3bf28ae181feda1f4bd08ca67f5e2fad55582cce5eb67304ae9",
+  lockRegistered: "0x539d162ca72154e998e9fd41983eea27e1e366d274b0a78a2a289d5bd70fd37b",
+};
 const testnetMockErc20Bytecode = "0x604060a0815234620003cb5762000bb4803803806200001e81620003cf565b928339810160a082820312620003cb5781516001600160401b0390818111620003cb57826200004f918501620003f5565b906020928385015190828211620003cb576200006d918601620003f5565b91858501519160ff83168303620003cb5760608601516001600160a01b0381169690879003620003cb5760800151938251828111620002e9575f54906001948583811c93168015620003c0575b89841014620002ca578190601f938481116200036d575b50899084831160011462000309575f92620002fd575b50505f19600383901b1c191690851b175f555b8151928311620002e9578354918483811c93168015620002de575b88841014620002ca57828285941162000275575b508791831160011462000211575f9262000205575b50505f19600383901b1c191690821b1790555b6080528062000173575b835161072c9081620004888239608051816102ff0152f35b8215620001d7575f917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9184845260038252858420620001b582825462000465565b9055620001c58160025462000465565b6002558551908152a35f80806200015b565b835162461bcd60e51b81526004810183905260076024820152667a65726f20746f60c81b6044820152606490fd5b015190505f806200013e565b90849350601f19831691845f52885f20925f5b8a8282106200025e575050841162000245575b505050811b01905562000151565b01515f1960f88460031b161c191690555f808062000237565b838501518655889790950194938401930162000224565b90919250845f52875f208380860160051c8201928a8710620002c0575b91869588929594930160051c01915b828110620002b157505062000129565b5f8155869550879101620002a1565b9250819262000292565b634e487b7160e01b5f52602260045260245ffd5b92607f169262000115565b634e487b7160e01b5f52604160045260245ffd5b015190505f80620000e7565b90879350601f198316915f80528b5f20925f5b8d8282106200035657505084116200033d575b505050811b015f55620000fa565b01515f1960f88460031b161c191690555f80806200032f565b8385015186558b979095019493840193016200031c565b9091505f8052895f208480850160051c8201928c8610620003b6575b918991869594930160051c01915b828110620003a7575050620000d1565b5f815585945089910162000397565b9250819262000389565b92607f1692620000ba565b5f80fd5b6040519190601f01601f191682016001600160401b03811183821017620002e957604052565b919080601f84011215620003cb5782516001600160401b038111620002e9576020906200042b601f8201601f19168301620003cf565b92818452828287010111620003cb575f5b818110620004515750825f9394955001015290565b85810183015184820184015282016200043c565b919082018092116200047357565b634e487b7160e01b5f52601160045260245ffdfe6080604081815260049182361015610015575f80fd5b5f3560e01c90816306fdde031461048e57508063095ea7b31461042057806318160ddd1461040257806323b872dd14610323578063313ce567146102e657806340c10f191461026357806370a082311461022c57806395d89b411461010a578063a9059cbb146100da5763dd62ed3e1461008d575f80fd5b346100d657806003193601126100d6576020916100a86105ac565b6100b06105c2565b6001600160a01b039182165f908152928552838320911682528352819020549051908152f35b5f80fd5b50346100d657806003193601126100d6576020906101036100f96105ac565b602435903361063c565b5160018152f35b50346100d6575f3660031901126100d6578051905f60018054908160011c9060018316928315610222575b602093848410811461020f578388529081156101f3575060011461019d575b505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b0390f35b604190634e487b7160e01b5f525260245ffd5b60015f908152929350837fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf65b8385106101df57505050508301015f8080610154565b8054888601830152930192849082016101c9565b60ff1916878501525050151560051b84010190505f8080610154565b602289634e487b7160e01b5f525260245ffd5b91607f1691610135565b50346100d65760203660031901126100d6576020906001600160a01b036102516105ac565b165f5260038252805f20549051908152f35b50346100d657806003193601126100d6575f7fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60206102a06105ac565b6001600160a01b031693602435906102b98615156105f9565b858552600383528085206102ce83825461062f565b90556102dc8260025461062f565b60025551908152a3005b50346100d6575f3660031901126100d6576020905160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100d65760603660031901126100d65761033d6105ac565b906103466105c2565b6044359060018060a01b03841693845f52602094868652845f20335f528652845f20548481106103d35796610380856101039798996105d8565b825f52818952875f20335f528952875f2055815f528752855f20335f528752855f20549086519182527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925883393a361063c565b855162461bcd60e51b81528089018890526009602482015268616c6c6f77616e636560b81b6044820152606490fd5b50346100d6575f3660031901126100d6576020906002549051908152f35b50346100d657806003193601126100d65760209161043c6105ac565b9060243590335f528452825f209160018060a01b031691825f52845280835f205582519081527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925843392a35160018152f35b919050346100d6575f3660031901126100d6575f805460018160011c906001831692831561055b575b602093848410811461020f578388529081156101f3575060011461050757505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b5f808052929350837f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5635b83851061054757505050508301015f8080610154565b805488860183015293019284908201610531565b91607f16916104b7565b602080825282518183018190529093925f5b82811061059857505060409293505f838284010152601f8019910116010190565b818101860151848201604001528501610577565b600435906001600160a01b03821682036100d657565b602435906001600160a01b03821682036100d657565b919082039182116105e557565b634e487b7160e01b5f52601160045260245ffd5b1561060057565b60405162461bcd60e51b81526020600482015260076024820152667a65726f20746f60c81b6044820152606490fd5b919082018092116105e557565b6001600160a01b039182169291906106558415156105f9565b1690815f5260036020528060405f2054106106c75760207fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef91835f526003825260405f206106a48282546105d8565b9055845f526003825260405f206106bc82825461062f565b9055604051908152a3565b60405162461bcd60e51b815260206004820152600760248201526662616c616e636560c81b6044820152606490fdfea264697066735822122050b11ecab6a4dc65b9df69cc3425166f94b6a3d865ab647a201facedb939a73364736f6c63430008180033";
 
 const platformEconomics = {
@@ -1162,11 +1172,17 @@ function explorerAddressUrl(address) {
 
 async function ethCall(to, data) {
   const call = { to, data };
+  return ethRpc("eth_call", [call, "latest"]);
+}
+
+async function ethRpc(method, params) {
+  let walletError = null;
   if (window.ethereum && state.connected && isWalletOnBnbTestnet()) {
-    return window.ethereum.request({
-      method: "eth_call",
-      params: [call, "latest"],
-    });
+    try {
+      return await window.ethereum.request({ method, params });
+    } catch (error) {
+      walletError = error;
+    }
   }
 
   const response = await fetch(bnbTestnet.rpcUrls[0], {
@@ -1175,13 +1191,78 @@ async function ethCall(to, data) {
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: Date.now(),
-      method: "eth_call",
-      params: [call, "latest"],
+      method,
+      params,
     }),
   });
   const payload = await response.json();
-  if (payload.error) throw new Error(payload.error.message || "BNB testnet RPC call failed.");
+  if (payload.error) {
+    throw new Error(payload.error.message || walletError?.message || "BNB testnet RPC call failed.");
+  }
   return payload.result;
+}
+
+async function ethBlockNumber() {
+  return BigInt(await ethRpc("eth_blockNumber", []));
+}
+
+async function ethGetLogs(filter) {
+  const logs = await ethRpc("eth_getLogs", [filter]);
+  return Array.isArray(logs) ? logs : [];
+}
+
+function blockTag(value) {
+  return `0x${BigInt(value).toString(16)}`;
+}
+
+function topicAddress(address) {
+  return `0x${normalizeAddress(address).replace(/^0x/, "").padStart(64, "0")}`;
+}
+
+function addressFromTopic(topic) {
+  const clean = String(topic || "").replace(/^0x/, "");
+  const value = clean.slice(-40);
+  return value ? `0x${value}` : "";
+}
+
+function logNumber(value) {
+  return Number(BigInt(value || "0x0"));
+}
+
+function latestLog(logs) {
+  return [...(logs || [])].sort((a, b) => {
+    const blockDiff = logNumber(a.blockNumber) - logNumber(b.blockNumber);
+    if (blockDiff) return blockDiff;
+    return logNumber(a.logIndex) - logNumber(b.logIndex);
+  }).at(-1) || null;
+}
+
+async function readEventLogs(filter, latestBlock) {
+  const latest = Number(latestBlock || await ethBlockNumber());
+  const lookback = Number(bnbTestnet.proofLogLookbackBlocks || 0);
+  const chunkSize = Math.max(1000, Number(bnbTestnet.proofLogChunkBlocks || 4000));
+  const fromStart = Math.max(0, latest - lookback);
+  const logs = [];
+
+  for (let from = fromStart; from <= latest; from += chunkSize) {
+    const to = Math.min(latest, from + chunkSize - 1);
+    const chunk = await ethGetLogs({
+      ...filter,
+      fromBlock: blockTag(from),
+      toBlock: blockTag(to),
+    });
+    logs.push(...chunk);
+  }
+
+  return logs;
+}
+
+async function safeReadEventLogs(filter, latestBlock) {
+  try {
+    return { logs: await readEventLogs(filter, latestBlock), error: "" };
+  } catch (error) {
+    return { logs: [], error: error.message || "Could not read event logs." };
+  }
 }
 
 async function ensureTestnetWallet() {
@@ -1926,6 +2007,115 @@ function resumeTestnetLaunch(launchAddress) {
   showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : `Loaded ${shortAddress(launch.address)}.`);
 }
 
+async function readProofTrailForSaleVault(address, config, accounting, latestBlock) {
+  const proof = {
+    available: false,
+    indexed: true,
+    source: "BNB testnet event logs",
+    saleVault: address,
+    pair: "",
+    lpReceiver: "",
+    platformTreasury: bnbTestnet.platformTreasury,
+    quoteSymbol: "USDT",
+    totalRaised: accounting.totalRaised,
+    platformFee: accounting.platformFee,
+    quoteToLiquidity: accounting.quoteToLiquidity,
+    creatorProceeds: accounting.creatorProceeds,
+    tokenPaired: config.saleTokenAmount || 0n,
+    lpMinted: 0n,
+    claimAmount: 0n,
+    claimWallet: "",
+    contributionTx: "",
+    finalizationTx: "",
+    lockTx: "",
+    claimTx: "",
+    logErrors: [],
+  };
+
+  const saleLogTopics = [
+    eventTopics.quoteReleasedForFinalization,
+    eventTopics.deposited,
+    eventTopics.tokensClaimed,
+    eventTopics.refundClaimed,
+  ];
+  const [saleLogsResult, finalizerLogsResult] = await Promise.all([
+    safeReadEventLogs({ address, topics: [saleLogTopics] }, latestBlock),
+    safeReadEventLogs(
+      {
+        address: bnbTestnet.contracts.topazFinalizer,
+        topics: [eventTopics.launchFinalized, topicAddress(address)],
+      },
+      latestBlock,
+    ),
+  ]);
+
+  if (saleLogsResult.error) proof.logErrors.push(saleLogsResult.error);
+  if (finalizerLogsResult.error) proof.logErrors.push(finalizerLogsResult.error);
+
+  const saleLogs = saleLogsResult.logs;
+  const contributionLog = latestLog(saleLogs.filter((log) => addressMatches(log.topics?.[0], eventTopics.deposited)));
+  const quoteLog = latestLog(saleLogs.filter((log) => addressMatches(log.topics?.[0], eventTopics.quoteReleasedForFinalization)));
+  const claimLogs = saleLogs.filter((log) => addressMatches(log.topics?.[0], eventTopics.tokensClaimed));
+  const walletClaimLogs = state.walletAddress
+    ? claimLogs.filter((log) => addressMatches(addressFromTopic(log.topics?.[1]), state.walletAddress))
+    : claimLogs;
+  const claimLog = latestLog(walletClaimLogs.length ? walletClaimLogs : claimLogs);
+  const finalizationLog = latestLog(finalizerLogsResult.logs);
+
+  if (contributionLog) {
+    proof.contributionTx = contributionLog.transactionHash;
+    proof.contributionAmount = decodeUint256(contributionLog.data);
+  }
+  if (quoteLog) {
+    proof.finalizationTx = quoteLog.transactionHash;
+    proof.totalRaised = decodeUint256(quoteLog.data, 0);
+    proof.platformFee = decodeUint256(quoteLog.data, 1);
+    proof.quoteToLiquidity = decodeUint256(quoteLog.data, 2);
+    proof.creatorProceeds = decodeUint256(quoteLog.data, 3);
+  }
+  if (finalizationLog) {
+    proof.finalizationTx = finalizationLog.transactionHash || proof.finalizationTx;
+    proof.pair = addressFromTopic(finalizationLog.topics?.[2]);
+    proof.lpReceiver = addressFromTopic(finalizationLog.topics?.[3]);
+    proof.quoteToLiquidity = decodeUint256(finalizationLog.data, 0);
+    proof.tokenPaired = decodeUint256(finalizationLog.data, 1);
+    proof.lpMinted = decodeUint256(finalizationLog.data, 2);
+  }
+  if (claimLog) {
+    proof.claimTx = claimLog.transactionHash;
+    proof.claimWallet = addressFromTopic(claimLog.topics?.[1]);
+    proof.claimAmount = decodeUint256(claimLog.data);
+  }
+
+  if (proof.pair) {
+    const lockLogsResult = await safeReadEventLogs(
+      {
+        address: bnbTestnet.contracts.lpLocker,
+        topics: [eventTopics.lockRegistered, topicAddress(proof.pair)],
+      },
+      latestBlock,
+    );
+    if (lockLogsResult.error) proof.logErrors.push(lockLogsResult.error);
+    const lockLog = latestLog(lockLogsResult.logs);
+    if (lockLog) {
+      proof.lockTx = lockLog.transactionHash;
+      proof.lpReceiver = bnbTestnet.contracts.lpLocker;
+      proof.creatorBeneficiary = addressFromTopic(lockLog.topics?.[2]);
+      proof.platformBeneficiary = addressFromTopic(lockLog.topics?.[3]);
+    }
+  }
+
+  proof.available = Boolean(
+    proof.contributionTx ||
+      proof.finalizationTx ||
+      proof.lockTx ||
+      proof.claimTx ||
+      proof.pair ||
+      proof.lpReceiver,
+  );
+  return proof.available ? proof : null;
+}
+
 async function readLaunchFactory() {
   const factory = bnbTestnet.contracts.launchFactory;
   const owner = decodeAddress(await ethCall(factory, contractSelectors.owner));
@@ -1936,12 +2126,18 @@ async function readLaunchFactory() {
     await ethCall(factory, `${contractSelectors.quoteTokenAllowed}${encodeAddress(bnbTestnet.contracts.mockUsdt)}`),
   );
   const launchCount = Number(decodeUint256(await ethCall(factory, contractSelectors.launchCount)));
+  let latestBlock = 0n;
+  try {
+    latestBlock = await ethBlockNumber();
+  } catch (error) {
+    latestBlock = 0n;
+  }
 
   const launchesOnChain = [];
   const start = Math.max(0, launchCount - 5);
   for (let index = start; index < launchCount; index += 1) {
     const launchAddress = decodeAddress(await ethCall(factory, `${contractSelectors.allLaunches}${encodeUint256(index)}`));
-    launchesOnChain.push(await readSaleVault(launchAddress, index));
+    launchesOnChain.push(await readSaleVault(launchAddress, index, latestBlock));
   }
 
   return {
@@ -1962,13 +2158,21 @@ async function readLaunchFactory() {
   };
 }
 
-async function readSaleVault(address, index) {
+async function readSaleVault(address, index, latestBlock = 0n) {
   const status = Number(decodeUint256(await ethCall(address, contractSelectors.status)));
   const totalRaised = decodeUint256(await ethCall(address, contractSelectors.totalRaised));
   const accounting = await ethCall(address, contractSelectors.previewAccounting);
   const config = decodeLaunchConfig(await ethCall(address, contractSelectors.config));
   const saleTokensFunded = decodeBool(await ethCall(address, contractSelectors.saleTokensFunded));
   const tokenMeta = await readTokenMeta(config.saleToken);
+  const accountingData = {
+    totalRaised,
+    platformFee: decodeUint256(accounting, 1),
+    netRaise: decodeUint256(accounting, 2),
+    quoteToLiquidity: decodeUint256(accounting, 3),
+    creatorProceeds: decodeUint256(accounting, 4),
+    refundTotal: decodeUint256(accounting, 5),
+  };
   let walletContribution = 0n;
   let walletClaimable = 0n;
   let walletClaimed = false;
@@ -1995,6 +2199,9 @@ async function readSaleVault(address, index) {
       walletRefunded = false;
     }
   }
+  const proofTrail =
+    status === 5 ? await readProofTrailForSaleVault(address, config, accountingData, latestBlock) : null;
+
   return {
     index,
     address,
@@ -2003,16 +2210,12 @@ async function readSaleVault(address, index) {
     config,
     saleTokensFunded,
     tokenMeta,
-    totalRaised,
-    platformFee: decodeUint256(accounting, 1),
-    netRaise: decodeUint256(accounting, 2),
-    quoteToLiquidity: decodeUint256(accounting, 3),
-    creatorProceeds: decodeUint256(accounting, 4),
-    refundTotal: decodeUint256(accounting, 5),
+    ...accountingData,
     walletContribution,
     walletClaimable,
     walletClaimed,
     walletRefunded,
+    proofTrail,
   };
 }
 
@@ -2748,6 +2951,7 @@ function testnetLaunchesForLaunchpad() {
         quoteToken: config.quoteToken || bnbTestnet.contracts.mockUsdt,
         index: launch.index,
         saleTokensFunded: launch.saleTokensFunded,
+        proofTrail: launch.proofTrail,
       },
     };
   });
@@ -3593,10 +3797,15 @@ function renderProofStatus(label, tone = "ready") {
 
 function testnetProofFor(launch) {
   const vault = launch?.testnet?.vault || launch?.address || "";
-  return testnetProofRegistry[normalizeAddress(vault)] || null;
+  const fallback = testnetProofRegistry[normalizeAddress(vault)] || null;
+  const indexed = launch?.testnet?.proofTrail || launch?.proofTrail || null;
+  if (!indexed?.available && !indexed?.indexed) return fallback;
+  return { ...(fallback || {}), ...indexed };
 }
 
-function proofQuantity(amount, symbol) {
+function proofQuantity(amount, symbol, decimals = 18) {
+  if (amount === undefined || amount === null || amount === "") return "Not available";
+  if (typeof amount === "bigint") return `${formatUnits(amount, decimals, 4)} ${escapeHtml(symbol)}`;
   return `${Number(amount || 0).toLocaleString("en-US")} ${escapeHtml(symbol)}`;
 }
 
@@ -3618,11 +3827,23 @@ function renderFinalizedProofTrail(launch) {
     `;
   }
 
-  const claimStatus = launch.claimedTokens ? "Claimed" : launch.claimableTokens > 0 ? "Ready to claim" : "Claim path open";
+  const claimStatus = proof.claimTx
+    ? launch.claimedTokens
+      ? "Claimed"
+      : "Claim proven"
+    : launch.claimableTokens > 0
+      ? "Ready to claim"
+      : "Claim path open";
+  const evidenceLabel = proof.indexed ? "Indexed proof" : "Saved proof";
+  const claimDetail = proof.claimTx
+    ? `${proofQuantity(proof.claimAmount, launch.symbol)} to ${renderAddressLink(proof.claimWallet)}`
+    : state.connected
+      ? "No claim event found yet for the connected wallet."
+      : "Connect a wallet to check buyer claim proof.";
   const rows = [
     [
       "1. Raise funded",
-      renderTxLink(proof.contributionTx, "Contribution tx"),
+      renderTxLink(proof.contributionTx, proof.contributionAmount ? "Latest contribution tx" : "Contribution tx"),
       `${proofQuantity(proof.totalRaised, proof.quoteSymbol)} recorded in ${renderAddressLink(proof.saleVault)}`,
       renderProofStatus("Soft cap met"),
     ],
@@ -3640,14 +3861,14 @@ function renderFinalizedProofTrail(launch) {
     ],
     [
       "4. LP locked",
-      renderAddressLink(proof.lpReceiver),
+      proof.lockTx ? renderTxLink(proof.lockTx, "Lock registration tx") : renderAddressLink(proof.lpReceiver),
       `${proofQuantity(proof.lpMinted, "LP")} sent to the fee-split locker`,
       renderProofStatus("Locked"),
     ],
     [
       "5. Buyer claim",
       renderTxLink(proof.claimTx, "Claim tx"),
-      `${proofQuantity(proof.claimAmount, launch.symbol)} to ${renderAddressLink(proof.claimWallet)}`,
+      claimDetail,
       renderProofStatus(claimStatus),
     ],
   ];
@@ -3656,9 +3877,10 @@ function renderFinalizedProofTrail(launch) {
     <section class="panel pad finalized-proof-trail">
       <div class="panel-title">
         <h3>Finalized Launch Proof Trail</h3>
-        <span class="verified">Testnet evidence</span>
+        <span class="verified">${evidenceLabel}</span>
       </div>
       <p class="muted">This is the permanent receipt buyers should see after a launch finishes: raise, fee split, Topaz liquidity, LP lock, and claim proof.</p>
+      ${proof.logErrors?.length ? `<div class="success-note show warn">Some proof logs were outside the current RPC window: ${escapeHtml(proof.logErrors[0])}</div>` : ""}
       ${renderDataTable(["Step", "Evidence", "Result", "State"], rows)}
     </section>
   `;
