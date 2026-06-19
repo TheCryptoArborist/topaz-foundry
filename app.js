@@ -661,6 +661,27 @@ const bnbTestnet = {
   platformTreasury: "0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE",
 };
 
+const testnetProofRegistry = {
+  "0x50abab6a9fccdd53413bb471dfdaa0b71582a70e": {
+    saleVault: "0x50abab6a9fccdd53413bb471dfdaa0b71582a70e",
+    pair: "0xb3da729600ef173050a98cf52fecf383a59bba94",
+    lpReceiver: bnbTestnet.contracts.lpLocker,
+    platformTreasury: bnbTestnet.platformTreasury,
+    contributionTx: "0x75e52ebfc907c512a4aec4c51019d072f7b9e768cbccced3462e986cdc96225e",
+    finalizationTx: "0x0c7edd5a49912c414c708969233253dffd6b7028c9924ef044153ec465275472",
+    claimTx: "0xda3d69347d820fbf160e87db0a85d3bd066fdbfa85baf50e6f6e78ee7880b40b",
+    claimWallet: bnbTestnet.expectedOwner,
+    quoteSymbol: "USDT",
+    totalRaised: 8000,
+    platformFee: 160,
+    quoteToLiquidity: 4704,
+    creatorProceeds: 3136,
+    tokenPaired: 1000000,
+    lpMinted: 4704,
+    claimAmount: 1000000,
+  },
+};
+
 const contractSelectors = {
   launchCount: "0x27cca59f",
   allLaunches: "0x41d6e9d3",
@@ -2542,14 +2563,15 @@ function verificationRowsFor(launch) {
   }
 
   if (status === "finalized") {
+    const proof = testnetProofFor(launch);
     return [
       ["Launch status", statusLabel(status), statusBuyerMeaning(status), "Live proof"],
       ["Soft / hard cap", `${money(softCapFor(launch))} / ${money(hardCapFor(launch))}`, `${money(launch.raised)} final raise`, "Met"],
       ["Platform success fee", money(plan.successFee), `${platformEconomics.successFeeLabel} of final raise`, "Accounted"],
       ["Net raise after fee", money(plan.netRaise), "Post-fee accounting base", "Ready"],
       ["Topaz liquidity", money(plan.quoteToLp), `${plan.liquidityPercent}% committed to LP`, "Added"],
-      ["Topaz pair", plan.pair, launch.proof.poolType, "Trade ready"],
-      ["LP token lock", launch.proof.lockTx, launch.proof.lockDuration, "Locked"],
+      ["Topaz pair", proof ? renderAddressLink(proof.pair) : plan.pair, launch.proof.poolType, "Trade ready"],
+      ["LP token lock", proof ? renderAddressLink(proof.lpReceiver) : launch.proof.lockTx, launch.proof.lockDuration, "Locked"],
       ["Buyer claims", "Open", "Claims follow vesting schedule", "Open"],
       ["Trade on Topaz", "Direct link available", "Use pair route if indexer lags", "Ready"],
     ];
@@ -3560,6 +3582,88 @@ function renderAddressLink(address) {
   return `<a class="address-link" href="${explorerAddressUrl(address)}" target="_blank" rel="noopener noreferrer">${shortAddress(address)}</a>`;
 }
 
+function renderTxLink(hash, label = "View transaction") {
+  if (!hash) return "Not available";
+  return `<a class="address-link" href="${explorerTxLink(hash)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`;
+}
+
+function renderProofStatus(label, tone = "ready") {
+  return `<span class="status ${tone}">${escapeHtml(label)}</span>`;
+}
+
+function testnetProofFor(launch) {
+  const vault = launch?.testnet?.vault || launch?.address || "";
+  return testnetProofRegistry[normalizeAddress(vault)] || null;
+}
+
+function proofQuantity(amount, symbol) {
+  return `${Number(amount || 0).toLocaleString("en-US")} ${escapeHtml(symbol)}`;
+}
+
+function renderFinalizedProofTrail(launch) {
+  if (launch.status !== "finalized") return "";
+
+  const proof = testnetProofFor(launch);
+  if (!proof) {
+    return `
+      <section class="panel pad callout finalized-proof-trail">
+        <div class="panel-title">
+          <h3>Finalized Launch Proof Trail</h3>
+          <span class="micro">Indexer needed</span>
+        </div>
+        <div class="success-note show warn">
+          This launch is finalized on chain, but exact transaction-level proof links are not saved for this SaleVault yet. Production should index finalization, LP lock, and claim events automatically.
+        </div>
+      </section>
+    `;
+  }
+
+  const claimStatus = launch.claimedTokens ? "Claimed" : launch.claimableTokens > 0 ? "Ready to claim" : "Claim path open";
+  const rows = [
+    [
+      "1. Raise funded",
+      renderTxLink(proof.contributionTx, "Contribution tx"),
+      `${proofQuantity(proof.totalRaised, proof.quoteSymbol)} recorded in ${renderAddressLink(proof.saleVault)}`,
+      renderProofStatus("Soft cap met"),
+    ],
+    [
+      "2. Finalize accounting",
+      renderTxLink(proof.finalizationTx, "Finalize tx"),
+      `${proofQuantity(proof.platformFee, proof.quoteSymbol)} fee to ${renderAddressLink(proof.platformTreasury)}<br>${proofQuantity(proof.creatorProceeds, proof.quoteSymbol)} creator proceeds`,
+      renderProofStatus("Accounted"),
+    ],
+    [
+      "3. Topaz LP created",
+      renderAddressLink(proof.pair),
+      `${proofQuantity(proof.quoteToLiquidity, proof.quoteSymbol)} + ${proofQuantity(proof.tokenPaired, launch.symbol)} paired`,
+      renderProofStatus("Pair ready"),
+    ],
+    [
+      "4. LP locked",
+      renderAddressLink(proof.lpReceiver),
+      `${proofQuantity(proof.lpMinted, "LP")} sent to the fee-split locker`,
+      renderProofStatus("Locked"),
+    ],
+    [
+      "5. Buyer claim",
+      renderTxLink(proof.claimTx, "Claim tx"),
+      `${proofQuantity(proof.claimAmount, launch.symbol)} to ${renderAddressLink(proof.claimWallet)}`,
+      renderProofStatus(claimStatus),
+    ],
+  ];
+
+  return `
+    <section class="panel pad finalized-proof-trail">
+      <div class="panel-title">
+        <h3>Finalized Launch Proof Trail</h3>
+        <span class="verified">Testnet evidence</span>
+      </div>
+      <p class="muted">This is the permanent receipt buyers should see after a launch finishes: raise, fee split, Topaz liquidity, LP lock, and claim proof.</p>
+      ${renderDataTable(["Step", "Evidence", "Result", "State"], rows)}
+    </section>
+  `;
+}
+
 function renderTestnetActions() {
   return `
     <div class="header-actions">
@@ -3825,6 +3929,7 @@ function renderProofCenterView() {
             <div class="metric"><span>Buyer Action</span><strong>${primaryActionFor(launch).button}</strong></div>
           </div>
         </section>
+        ${renderFinalizedProofTrail(launch)}
         <section class="panel pad">
           <div class="panel-title">
             <h3>Verification Checklist</h3>
