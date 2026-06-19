@@ -628,6 +628,7 @@ const wizardGuidance = {
 const topazV2 = {
   chain: "BNB Chain",
   chainId: "56",
+  tradeUrl: "https://topazdex.com",
   router: "0x1E98c8226e7d452e1888e3d3d2F929346321c6c3",
   factory: "0x65E6cD0eF5D3467030103cf3d433034E570b5784",
   voter: "0x2F80F810a114223AC69E34E84E735CaD515dAD67",
@@ -3833,6 +3834,40 @@ function renderProofStatus(label, tone = "ready") {
   return `<span class="status ${tone}">${escapeHtml(label)}</span>`;
 }
 
+function topazTradeDestination(launch) {
+  const proof = testnetProofFor(launch);
+  if (launch?.testnet && isEvmAddress(proof?.pair)) {
+    return {
+      label: "View Testnet Pair",
+      url: explorerAddressUrl(proof.pair),
+      message: "Opened the BNB testnet mock Topaz pair proof.",
+    };
+  }
+
+  return {
+    label: "Trade on Topaz",
+    url: finalizationPlan(launch).tradeUrl || topazV2.tradeUrl,
+    message: "Topaz trade page opened.",
+  };
+}
+
+function openTopazTrade() {
+  const launch = currentLaunch();
+  if (launch.status !== "finalized") {
+    showToast("The Topaz trade route is published after a successful finalization.");
+    return;
+  }
+
+  const destination = topazTradeDestination(launch);
+  if (!destination?.url) {
+    showToast("Topaz trade link is not available yet.");
+    return;
+  }
+
+  window.open(destination.url, "_blank", "noopener,noreferrer");
+  showToast(destination.message);
+}
+
 function testnetProofFor(launch) {
   const vault = launch?.testnet?.vault || launch?.address || "";
   const fallback = testnetProofRegistry[normalizeAddress(vault)] || null;
@@ -4156,8 +4191,8 @@ function renderProofCenterView() {
         : `${launch.name} Launch Verification`;
   const tradeAction =
     launch.status === "finalized"
-      ? '<button class="button primary" type="button" data-action="show-toast">' + icons.swap + " Trade on Topaz</button>"
-      : '<button class="button ghost" type="button" data-action="show-toast">Copy verification link</button>';
+      ? `<button class="button primary" type="button" data-action="open-topaz-trade">${icons.swap} ${topazTradeDestination(launch).label}</button>`
+      : '<button class="button ghost" type="button" data-action="copy-launch-link">Copy verification link</button>';
 
   return `
     <div class="page-stack">
@@ -4381,7 +4416,7 @@ function renderFinalizeView() {
             <div class="review-row"><span>Verification page</span><strong>Permanent</strong></div>
           </div>
           <div class="drawer-actions finalize-actions">
-            <button class="button primary" type="button" data-action="show-toast">${icons.swap} Trade on Topaz</button>
+            <button class="button primary" type="button" data-action="open-topaz-trade">${icons.swap} ${topazTradeDestination(preview.launch).label}</button>
             <button class="button ghost" type="button" data-view="proof">View Verification</button>
           </div>
         </section>
@@ -5312,6 +5347,9 @@ async function handleClick(event) {
       break;
     case "watch-launch":
       showToast("Launch watch captured. Production mode would save a reminder for this project.");
+      break;
+    case "open-topaz-trade":
+      openTopazTrade();
       break;
     case "copy-social": {
       const launch = currentLaunch();
