@@ -523,6 +523,11 @@ const state = {
     hash: "",
     error: "",
   },
+  claimTx: {
+    status: "",
+    hash: "",
+    error: "",
+  },
   finalizationTx: {
     status: "",
     hash: "",
@@ -675,6 +680,11 @@ const contractSelectors = {
   erc20BalanceOf: "0x70a08231",
   saleVaultDeposit: "0xb6b55f25",
   saleVaultContributions: "0x42e94c90",
+  saleVaultClaimTokens: "0x48c54b9d",
+  saleVaultClaimRefund: "0xb5545a3c",
+  saleVaultClaimableTokens: "0x84d24226",
+  saleVaultClaimed: "0xc884ef83",
+  saleVaultRefunded: "0xc033a490",
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
@@ -1634,6 +1644,108 @@ async function contributeToTestnetLaunch() {
   }
 }
 
+function claimValidation(launch, mode = "token") {
+  if (!launch?.testnet?.vault) return { ok: false, message: "This launch is preview-only, so no testnet claim can be sent." };
+  if (!state.connected) return { ok: false, message: "Connect the buyer wallet on BNB testnet." };
+  if (!isWalletOnBnbTestnet()) return { ok: false, message: "Switch the wallet to BNB testnet first." };
+
+  const contributed = Number(launch.yourContribution || 0);
+  if (mode === "refund") {
+    if (launch.status !== "refunding") return { ok: false, message: "Refunds are not open for this launch." };
+    if (launch.refunded) return { ok: false, message: "This wallet has already claimed its refund." };
+    if (contributed <= 0) return { ok: false, message: "This wallet did not contribute to this SaleVault." };
+    return { ok: true, message: `Ready to claim ${contributed.toLocaleString()} ${quoteAsset(launch)} back from the SaleVault.` };
+  }
+
+  const claimable = Number(launch.claimableTokens || 0);
+  if (launch.status !== "finalized") return { ok: false, message: "Token claims open after successful finalization." };
+  if (launch.claimedTokens) return { ok: false, message: "This wallet has already claimed its launch tokens." };
+  if (claimable <= 0) return { ok: false, message: "This wallet has no claimable tokens for this SaleVault." };
+  return { ok: true, message: `Ready to claim ${claimable.toLocaleString()} ${launch.symbol}.` };
+}
+
+async function claimTokensFromSaleVault() {
+  const launch = currentLaunch();
+  if (!launch?.testnet?.vault) {
+    showToast("Claim simulation ready. Production flow would release vested or finalized launch tokens.");
+    return;
+  }
+
+  if (!state.connected) {
+    await connectWallet();
+    return;
+  }
+
+  const validation = claimValidation(launch, "token");
+  if (!validation.ok) {
+    state.claimTx = { status: validation.message, hash: "", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  try {
+    state.claimTx = { status: "Send token claim in your wallet...", hash: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(launch.testnet.vault, contractSelectors.saleVaultClaimTokens);
+    state.claimTx = { status: "Token claim submitted. Waiting for confirmation...", hash, error: "" };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error("Token claim transaction reverted.");
+
+    state.claimTx = { status: `${Number(launch.claimableTokens || 0).toLocaleString()} ${launch.symbol} claimed.`, hash, error: "" };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("Token claim confirmed on BNB testnet.");
+  } catch (error) {
+    const message = error.message || "Token claim was not completed.";
+    state.claimTx = { ...state.claimTx, status: "Token claim not completed.", error: message };
+    renderApp();
+    showToast(message);
+  }
+}
+
+async function claimRefundFromSaleVault() {
+  const launch = currentLaunch();
+  if (!launch?.testnet?.vault) {
+    showToast("Refund simulation ready. Production flow would return the quote asset from the sale vault.");
+    return;
+  }
+
+  if (!state.connected) {
+    await connectWallet();
+    return;
+  }
+
+  const validation = claimValidation(launch, "refund");
+  if (!validation.ok) {
+    state.claimTx = { status: validation.message, hash: "", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  try {
+    state.claimTx = { status: "Send refund claim in your wallet...", hash: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(launch.testnet.vault, contractSelectors.saleVaultClaimRefund);
+    state.claimTx = { status: "Refund claim submitted. Waiting for confirmation...", hash, error: "" };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error("Refund claim transaction reverted.");
+
+    state.claimTx = { status: `${Number(launch.yourContribution || 0).toLocaleString()} ${quoteAsset(launch)} refund claimed.`, hash, error: "" };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("Refund claim confirmed on BNB testnet.");
+  } catch (error) {
+    const message = error.message || "Refund claim was not completed.";
+    state.claimTx = { ...state.claimTx, status: "Refund claim not completed.", error: message };
+    renderApp();
+    showToast(message);
+  }
+}
+
 function decodeLaunchConfig(result) {
   return {
     creator: decodeAddress(result, 0),
@@ -1735,6 +1847,24 @@ function resumeTestnetLaunch(launchAddress) {
     return;
   }
 
+  if (!resumableTestnetLaunch(launch) && !testnetLaunchFinalizable(launch)) {
+    state.view = "launchpad";
+    state.tab = statusKeyFromLabel(launch.statusLabel);
+    state.selectedId = `testnet-${launch.index}`;
+    state.testnetLaunchTx = {
+      status: `Loaded ${launch.statusLabel} SaleVault on the Launchpad.`,
+      hash: "",
+      launchAddress: launch.address,
+      error: "",
+    };
+    renderApp();
+    window.setTimeout(() => {
+      document.querySelector(".side-stack")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+    showToast(`${launch.statusLabel} SaleVault loaded on the Launchpad.`);
+    return;
+  }
+
   const config = launch.config || {};
   state.wizardForm.tokenName = launch.tokenMeta?.name || state.wizardForm.tokenName;
   state.wizardForm.symbol = launch.tokenMeta?.symbol || state.wizardForm.symbol;
@@ -1819,11 +1949,29 @@ async function readSaleVault(address, index) {
   const saleTokensFunded = decodeBool(await ethCall(address, contractSelectors.saleTokensFunded));
   const tokenMeta = await readTokenMeta(config.saleToken);
   let walletContribution = 0n;
+  let walletClaimable = 0n;
+  let walletClaimed = false;
+  let walletRefunded = false;
   if (state.connected && isEvmAddress(state.walletAddress)) {
     try {
       walletContribution = decodeUint256(await ethCall(address, `${contractSelectors.saleVaultContributions}${encodeAbiAddress(state.walletAddress)}`));
     } catch (error) {
       walletContribution = 0n;
+    }
+    try {
+      walletClaimable = decodeUint256(await ethCall(address, `${contractSelectors.saleVaultClaimableTokens}${encodeAbiAddress(state.walletAddress)}`));
+    } catch (error) {
+      walletClaimable = 0n;
+    }
+    try {
+      walletClaimed = decodeBool(await ethCall(address, `${contractSelectors.saleVaultClaimed}${encodeAbiAddress(state.walletAddress)}`));
+    } catch (error) {
+      walletClaimed = false;
+    }
+    try {
+      walletRefunded = decodeBool(await ethCall(address, `${contractSelectors.saleVaultRefunded}${encodeAbiAddress(state.walletAddress)}`));
+    } catch (error) {
+      walletRefunded = false;
     }
   }
   return {
@@ -1841,6 +1989,9 @@ async function readSaleVault(address, index) {
     creatorProceeds: decodeUint256(accounting, 4),
     refundTotal: decodeUint256(accounting, 5),
     walletContribution,
+    walletClaimable,
+    walletClaimed,
+    walletRefunded,
   };
 }
 
@@ -2501,9 +2652,13 @@ function testnetLaunchesForLaunchpad() {
     const token = config.saleToken || "";
     const logoDataUrl = storedTokenLogo({ saleToken: token, launchAddress: vault, symbol });
     const summary =
-      status === "live"
-        ? "This real BNB testnet SaleVault is open and accepting mock USDT deposits for the rehearsal launch."
-        : "This real BNB testnet SaleVault is visible from the LaunchFactory and can be inspected before buyer deposits open.";
+      status === "finalized"
+        ? "This real BNB testnet SaleVault finalized successfully. Buyer token claims are now available from the vault."
+        : status === "refunding"
+          ? "This real BNB testnet SaleVault missed soft cap. Buyer refunds can now be claimed from the vault."
+          : status === "live"
+            ? "This real BNB testnet SaleVault is open and accepting mock USDT deposits for the rehearsal launch."
+            : "This real BNB testnet SaleVault is visible from the LaunchFactory and can be inspected before buyer deposits open.";
 
     return {
       id: `testnet-${launch.index}`,
@@ -2519,7 +2674,7 @@ function testnetLaunchesForLaunchpad() {
       quoteAsset: "USDT",
       price: "Pro rata allocation",
       hardCap: `${formatUnits(config.hardCap || 0n)} USDT`,
-      endsIn: status === "live" ? "Deposits open" : launch.statusLabel,
+      endsIn: status === "live" ? "Deposits open" : status === "finalized" ? "Claims open" : launch.statusLabel,
       summary,
       tags: ["BNB Testnet", "On-chain", `SaleVault ${shortAddress(vault)}`],
       min: unitsToNumber(config.walletMin),
@@ -2528,6 +2683,9 @@ function testnetLaunchesForLaunchpad() {
       contributors: raised > 0 ? 1 : 0,
       avgContribution: raised,
       yourContribution: walletContribution,
+      claimableTokens: unitsToNumber(launch.walletClaimable || 0n),
+      claimedTokens: Boolean(launch.walletClaimed),
+      refunded: Boolean(launch.walletRefunded),
       vesting: [
         ["TGE", "Configured", "After finalization"],
         ["Claims", "Pro rata", "When finalized"],
@@ -2546,7 +2704,7 @@ function testnetLaunchesForLaunchpad() {
         cliff: "Public at claim setup",
         incentives: "Optional",
         distributor: "After finalization",
-        start: status === "live" ? "Open now on BNB testnet" : launch.statusLabel,
+        start: status === "live" ? "Open now on BNB testnet" : status === "finalized" ? "Claimable on BNB testnet" : launch.statusLabel,
       },
       risk: ["BNB testnet rehearsal", "Mock USDT only", "Topaz pair is created only after successful finalization"],
       post: {
@@ -3087,6 +3245,55 @@ function renderContributionNote(launch) {
   `;
 }
 
+function renderClaimActionPanel(launch, mode = "token") {
+  const action = primaryActionFor(launch);
+  const isRefund = mode === "refund";
+  const isRealTestnet = Boolean(launch.testnet?.vault);
+  const amount = isRefund ? Number(launch.yourContribution || 0) : Number(launch.claimableTokens || 0);
+  const asset = isRefund ? quoteAsset(launch) : launch.symbol;
+  const alreadyDone = isRefund ? launch.refunded : launch.claimedTokens;
+  const buttonLabel = !state.connected
+    ? "Connect Wallet"
+    : alreadyDone
+      ? isRefund
+        ? "Refund Claimed"
+        : "Tokens Claimed"
+      : amount > 0
+        ? action.button
+        : isRefund
+          ? "No Refund Available"
+          : "No Claim Available";
+  const disabled = isRealTestnet && state.connected && (alreadyDone || amount <= 0);
+  const preflight = isRealTestnet && state.connected ? claimValidation(launch, mode) : null;
+  const claimState = alreadyDone ? "Already claimed" : amount > 0 ? "Ready" : "None for this wallet";
+
+  return `
+    <section class="panel pad">
+      <div class="panel-title">
+        <h3>${action.title}</h3>
+        <span class="status ${launchOutcome(launch).tone}">${launchOutcome(launch).label}</span>
+      </div>
+      <p class="muted action-note">${action.note}</p>
+      <div class="review-list">
+        <div class="review-row"><span>Your contribution</span><strong>${Number(launch.yourContribution || 0).toLocaleString()} ${quoteAsset(launch)}</strong></div>
+        <div class="review-row"><span>${isRefund ? "Refundable" : "Claimable now"}</span><strong>${amount.toLocaleString()} ${asset}</strong></div>
+        <div class="review-row"><span>Claim state</span><strong>${claimState}</strong></div>
+        <div class="review-row"><span>SaleVault</span><strong>${launch.testnet?.vault ? shortAddress(launch.testnet.vault) : "Preview"}</strong></div>
+      </div>
+      <div class="assist-note">
+        <strong>${isRefund ? "Refund path" : "Post-launch claim"}</strong>
+        <span>${isRefund ? "Because soft cap was missed, buyers claim the quote asset back from the SaleVault." : "Because the launch finalized, buyers claim their pro rata sale tokens from the SaleVault."}</span>
+      </div>
+      ${preflight ? `<div class="success-note show ${preflight.ok ? "" : "warn"}">${escapeHtml(preflight.message)}</div>` : ""}
+      <button class="button primary full-width" type="button" data-action="${action.action}" ${disabled ? "disabled" : ""}>${buttonLabel}</button>
+      <div class="success-note ${state.claimTx.status || state.claimTx.error ? "show" : ""} ${state.claimTx.error ? "warn" : ""}">
+        ${escapeHtml(state.claimTx.error || state.claimTx.status)}
+        ${state.claimTx.hash ? `<br><a href="${explorerTxLink(state.claimTx.hash)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
+      </div>
+    </section>
+  `;
+}
+
 function renderContribute(launch) {
   const action = primaryActionFor(launch);
   const disabled = launch.status !== "live";
@@ -3097,6 +3304,9 @@ function renderContribute(launch) {
   const minValue = priorContribution > 0 ? `Any amount` : `${launch.min.toLocaleString()} ${asset}`;
   const maxLabel = priorContribution > 0 ? "Remaining max" : "Maximum";
   const maxValue = `${remainingMax.toLocaleString()} ${asset}`;
+
+  if (launch.status === "finalized") return renderClaimActionPanel(launch, "token");
+  if (launch.status === "refunding") return renderClaimActionPanel(launch, "refund");
 
   if (disabled) {
     return `
@@ -3406,7 +3616,13 @@ function testnetLaunchRows() {
     resumableTestnetLaunch(launch)
       ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
       : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">${
-          testnetLaunchFinalizable(launch) ? "Load finalization" : launch.statusLabel === "Finalized" ? "View proof" : "Set logo"
+          testnetLaunchFinalizable(launch)
+            ? "Load finalization"
+            : launch.statusLabel === "Finalized"
+              ? "View claims"
+              : launch.statusLabel === "Refunding"
+                ? "View refunds"
+                : "View launch"
         }</button>`,
   ]);
 }
@@ -4721,10 +4937,10 @@ async function handleClick(event) {
       }
       break;
     case "claim-refund":
-      showToast("Refund simulation ready. Production flow would return the quote asset from the sale vault.");
+      await claimRefundFromSaleVault();
       break;
     case "claim-token":
-      showToast("Claim simulation ready. Production flow would release vested or finalized launch tokens.");
+      await claimTokensFromSaleVault();
       break;
     case "watch-launch":
       showToast("Launch watch captured. Production mode would save a reminder for this project.");

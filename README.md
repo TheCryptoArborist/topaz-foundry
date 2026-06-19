@@ -35,6 +35,7 @@ The prototype shows:
 - Read-only BNB testnet screen with wallet detection, chain 97 status, deployed contract addresses, launch count, wiring checks, and recent sale vault status reads.
 - Create-launch drawer where project creators add a token logo and set controlled raise, liquidity, vesting, incentive, links, social, and review details. Fair Launch is the self-serve MVP path; fixed-price sale and liquidity bootstrap are available with guided review/setup.
 - BNB testnet write path in the Create Launch flow for the owner/admin wallet: deploy a simple test ERC20 token, create a Draft SaleVault through the deployed LaunchFactory, approve sale tokens, fund the vault, approve the launch, and open a fair-launch vault.
+- BNB testnet buyer claim path for finalized or refunding SaleVaults: contributors can claim launch tokens after successful finalization or claim mock USDT refunds after a failed soft-cap outcome.
 - Optional creator share kit with generated X/Telegram/Discord progress updates, campaign tags, and launch-link copying for each token raise.
 - Approval gate: new launches move Draft -> Pending Review -> Approved before they can be scheduled or go live.
 - Soft-cap outcome rules: launches that meet soft cap finalize from the actual raise, while launches below soft cap move to refunds with 0% platform fee, no Topaz pool, no LP lock, and no buyer claims.
