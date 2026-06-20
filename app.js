@@ -2538,20 +2538,24 @@ function primaryActionFor(launch) {
   }
 
   if (launch.status === "refunding") {
+    const alreadyRefunded = state.connected && launch.refunded;
+    const hasRefund = Number(launch.yourContribution || 0) > 0;
     return {
       title: "Refunds are open",
       note: "The soft cap was missed, so buyer deposits return from the sale vault.",
-      button: "Claim Refund",
-      action: "claim-refund",
+      button: alreadyRefunded ? "Refund Claimed" : state.connected && !hasRefund ? "No Refund Available" : "Claim Refund",
+      action: alreadyRefunded || (state.connected && !hasRefund) ? "show-toast" : "claim-refund",
     };
   }
 
   if (launch.status === "finalized") {
+    const alreadyClaimed = state.connected && launch.claimedTokens;
+    const hasClaim = Number(launch.claimableTokens || 0) > 0;
     return {
       title: "Token claims are open",
       note: "The launch finalized, liquidity proof is published, and buyer claims follow the vesting schedule.",
-      button: "Claim Tokens",
-      action: "claim-token",
+      button: alreadyClaimed ? "Tokens Claimed" : state.connected && !hasClaim ? "No Claim Available" : "Claim Tokens",
+      action: alreadyClaimed || (state.connected && !hasClaim) ? "show-toast" : "claim-token",
     };
   }
 
