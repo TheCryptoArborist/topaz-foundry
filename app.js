@@ -712,6 +712,7 @@ const contractSelectors = {
   fundSaleTokens: "0x163fef89",
   approveLaunch: "0x28b9b4fb",
   openLaunch: "0x5d23e07d",
+  enableRefunds: "0x8c52f467",
   topazFinalizeLaunch: "0x58e76b9e",
   topazGetPool: "0x79bc57d5",
   erc20Name: "0x06fdde03",
@@ -1523,6 +1524,11 @@ async function runTestnetLaunchAction(action) {
       to: bnbTestnet.contracts.launchFactory,
       data: `${contractSelectors.openLaunch}${encodeAbiAddress(launchAddress)}`,
     },
+    enableRefunds: {
+      label: "Enable refunds",
+      to: bnbTestnet.contracts.launchFactory,
+      data: `${contractSelectors.enableRefunds}${encodeAbiAddress(launchAddress)}`,
+    },
   };
   const config = actions[action];
   if (!config) return;
@@ -1898,6 +1904,13 @@ function testnetLaunchFinalizable(launch) {
   return launch?.statusLabel === "Live" && testnetSoftCapMet(launch);
 }
 
+function testnetLaunchRefundable(launch) {
+  if (!["Live", "Upcoming"].includes(launch?.statusLabel)) return false;
+  const softCap = BigInt(launch?.config?.softCap || 0n);
+  const raised = BigInt(launch?.totalRaised || 0n);
+  return softCap > 0n && raised < softCap;
+}
+
 function selectedTestnetLaunch() {
   const launchAddress = state.testnetLaunchTx.launchAddress;
   if (!isEvmAddress(launchAddress)) return null;
@@ -1925,6 +1938,14 @@ function finalizationValidation(launch) {
   return { ok: true, message: "Ready to finalize this launch on BNB testnet." };
 }
 
+function refundValidation(launch) {
+  if (!isEvmAddress(launch?.address)) return { ok: false, message: "Select a testnet SaleVault first." };
+  if (!ownerWalletReady()) return { ok: false, message: "Connect the owner wallet on BNB testnet." };
+  if (!["Live", "Upcoming"].includes(launch.statusLabel)) return { ok: false, message: "Only a live or upcoming SaleVault can move to refunds." };
+  if (testnetSoftCapMet(launch)) return { ok: false, message: "Soft cap is met, so this launch cannot move to refunds." };
+  return { ok: true, message: "Ready to close this failed test launch and open refunds." };
+}
+
 function testnetLaunchNextAction(launch) {
   if (!launch) return "Select a launch";
   if (launch.statusLabel === "Draft") {
@@ -1934,6 +1955,7 @@ function testnetLaunchNextAction(launch) {
     return launch.saleTokensFunded ? "Open launch" : "Approve tokens, fund vault, open launch";
   }
   if (testnetLaunchFinalizable(launch)) return "Ready to finalize";
+  if (testnetLaunchRefundable(launch)) return "Enable refunds or keep deposits open";
   if (launch.statusLabel === "Live") return "Accepting deposits";
   if (launch.statusLabel === "Finalized") return "Finalized";
   if (launch.statusLabel === "Refunding") return "Refund path proven";
@@ -1951,7 +1973,7 @@ function resumeTestnetLaunch(launchAddress) {
     return;
   }
 
-  if (!resumableTestnetLaunch(launch) && !testnetLaunchFinalizable(launch)) {
+  if (!resumableTestnetLaunch(launch) && !testnetLaunchFinalizable(launch) && !testnetLaunchRefundable(launch)) {
     state.view = "launchpad";
     state.tab = statusKeyFromLabel(launch.statusLabel);
     state.selectedId = `testnet-${launch.index}`;
@@ -1990,9 +2012,12 @@ function resumeTestnetLaunch(launchAddress) {
   state.wizardForm.tokenLogoDataUrl = savedLogo;
   state.wizardForm.tokenLogoName = savedLogo ? state.wizardForm.tokenLogoName : "";
   const finalizable = testnetLaunchFinalizable(launch);
+  const refundable = testnetLaunchRefundable(launch);
   state.testnetLaunchTx = {
     status: finalizable
       ? "Loaded a soft-cap-met SaleVault. Next: approve LP tokens, then finalize the launch."
+      : refundable
+        ? "Loaded a below-soft-cap SaleVault. Next: enable refunds only if this test raise is closing as failed."
       : `Loaded ${launch.statusLabel} SaleVault. Next: ${testnetLaunchNextAction(launch)}.`,
     hash: "",
     launchAddress: launch.address,
@@ -2003,10 +2028,10 @@ function resumeTestnetLaunch(launchAddress) {
   renderApp();
   window.setTimeout(() => {
     document
-      .getElementById(finalizable ? "testnet-finalization-panel" : "testnet-launch-writer")
+      .getElementById(finalizable ? "testnet-finalization-panel" : refundable ? "testnet-refund-panel" : "testnet-launch-writer")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, 0);
-  showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : `Loaded ${shortAddress(launch.address)}.`);
+  showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : refundable ? "Refund panel loaded." : `Loaded ${shortAddress(launch.address)}.`);
 }
 
 async function readProofTrailForSaleVault(address, config, accounting, latestBlock, fromBlock) {
@@ -4015,8 +4040,8 @@ function testnetLaunchRows() {
       : launch.statusLabel === "Refunding"
         ? "Refund path proven"
         : testnetLaunchNextAction(launch),
-    resumableTestnetLaunch(launch)
-      ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">Continue setup</button>`
+    resumableTestnetLaunch(launch) || testnetLaunchRefundable(launch)
+      ? `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">${testnetLaunchRefundable(launch) ? "Enable refunds" : "Continue setup"}</button>`
       : `<button class="button ghost" type="button" data-action="resume-testnet-launch" data-launch-address="${launch.address}">${
           testnetLaunchFinalizable(launch)
             ? "Load finalization"
@@ -4907,8 +4932,57 @@ function renderMissingLaunchFields(issues) {
   `;
 }
 
+function renderTestnetRefundPanel(launch) {
+  if (!launch || !["Live", "Upcoming", "Refunding"].includes(launch.statusLabel)) return "";
+
+  const validation = refundValidation(launch);
+  const softCap = BigInt(launch.config?.softCap || 0n);
+  const raised = BigInt(launch.totalRaised || 0n);
+  const shortfall = softCap > raised ? softCap - raised : 0n;
+
+  if (launch.statusLabel === "Refunding") {
+    return `
+      <div class="finalization-box" id="testnet-refund-panel">
+        <div class="panel-title">
+          <h3>Refunds Open</h3>
+          <span class="status refunding">Refunding</span>
+        </div>
+        <div class="assist-note">
+          <strong>What happens now</strong>
+          <span>Buyers can claim their mock USDT back from this SaleVault. No platform success fee, Topaz pair, or LP lock is created for a failed launch.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!testnetLaunchRefundable(launch)) return "";
+
+  return `
+    <div class="finalization-box" id="testnet-refund-panel">
+      <div class="panel-title">
+        <h3>Refund Failed Test Launch</h3>
+        <span class="status refunding">Below soft cap</span>
+      </div>
+      <div class="assist-note">
+        <strong>What this does</strong>
+        <span>This closes the selected below-soft-cap SaleVault as failed and opens buyer refunds. Use this only when you are done accepting deposits for this test raise.</span>
+      </div>
+      <div class="review-list">
+        <div class="review-row"><span>Total raised</span><strong>${formatUnits(raised)} USDT</strong></div>
+        <div class="review-row"><span>Soft cap</span><strong>${formatUnits(softCap)} USDT</strong></div>
+        <div class="review-row"><span>Shortfall</span><strong>${formatUnits(shortfall)} USDT</strong></div>
+        <div class="review-row"><span>Outcome</span><strong>Refunds only, 0% platform success fee</strong></div>
+      </div>
+      <div class="success-note show ${validation.ok ? "" : "warn"}">${escapeHtml(validation.message)}</div>
+      <div class="tx-actions finalization-actions">
+        <button class="button gold" type="button" data-action="enable-testnet-refunds" ${validation.ok ? "" : "disabled"}>Enable Refunds</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderTestnetFinalizationPanel(launch) {
-  if (!launch || !["Live", "Finalized"].includes(launch.statusLabel)) return "";
+  if (!launch || !["Live", "Finalized"].includes(launch.statusLabel) || testnetLaunchRefundable(launch)) return "";
 
   const validation = finalizationValidation(launch);
   const quoteToken = launch.config?.quoteToken || bnbTestnet.contracts.mockUsdt;
@@ -5038,6 +5112,7 @@ function renderTestnetLaunchWriter() {
         <button class="button gold" type="button" data-action="approve-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Approve Launch</button>
         <button class="button primary" type="button" data-action="open-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Open Launch</button>
       </div>
+      ${renderTestnetRefundPanel(selectedLaunch)}
       ${renderTestnetFinalizationPanel(selectedLaunch)}
       ${Number(form.saleType) === 0 ? "" : '<p class="muted tx-footnote">Guided sale modes can be drafted on-chain, but buyer deposits for fixed-price and liquidity-bootstrap modes still need their adapter contracts.</p>'}
     </div>
@@ -5325,6 +5400,9 @@ async function handleClick(event) {
       break;
     case "open-testnet-launch":
       await runTestnetLaunchAction("openLaunch");
+      break;
+    case "enable-testnet-refunds":
+      await runTestnetLaunchAction("enableRefunds");
       break;
     case "approve-finalizer-tokens":
       await approveFinalizerTokens();
