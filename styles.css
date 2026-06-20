@@ -1892,6 +1892,16 @@ h3 {
   color: var(--teal);
 }
 
+.setup-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.setup-guide-actions .button {
+  min-width: 180px;
+}
+
 .missing-item {
   display: flex;
   justify-content: space-between;
@@ -2205,6 +2215,10 @@ h3 {
   .setup-step em {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .setup-guide-actions .button {
+    width: 100%;
   }
 
   .metrics {

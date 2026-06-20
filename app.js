@@ -5031,6 +5031,23 @@ function renderTestnetSetupGuide(launch, canRunVaultActions) {
     : launch.statusLabel === "Live"
       ? "This launch is live and accepting deposits. Go to Launchpad to monitor contributions."
       : "This launch is already finalized or in refunds. Go to Launchpad to view it.";
+  const launchButtonLabel =
+    launch.statusLabel === "Live"
+      ? "View Live Launch"
+      : launch.statusLabel === "Finalized"
+        ? "View Claims"
+        : launch.statusLabel === "Refunding"
+          ? "View Refunds"
+          : "View Launch";
+  const launchShortcut = nextKey
+    ? ""
+    : `
+      <div class="setup-guide-actions">
+        <button class="button primary" type="button" data-action="view-testnet-launch" data-launch-address="${launch.address}">
+          ${launchButtonLabel}
+        </button>
+      </div>
+    `;
 
   return `
     <div class="setup-guide">
@@ -5058,6 +5075,7 @@ function renderTestnetSetupGuide(launch, canRunVaultActions) {
           })
           .join("")}
       </div>
+      ${launchShortcut}
     </div>
   `;
 }
@@ -5544,6 +5562,31 @@ async function handleClick(event) {
     case "resume-testnet-launch":
       resumeTestnetLaunch(target.dataset.launchAddress);
       break;
+    case "view-testnet-launch": {
+      const launchAddress = target.dataset.launchAddress;
+      const launch = (state.testnetData.launches || []).find((item) => addressMatches(item.address, launchAddress));
+      if (!launch) {
+        showToast("Refresh testnet reads, then try that SaleVault again.");
+        break;
+      }
+
+      state.view = "launchpad";
+      state.tab = statusKeyFromLabel(launch.statusLabel);
+      state.selectedId = `testnet-${launch.index}`;
+      state.wizardOpen = false;
+      state.testnetLaunchTx = {
+        status: `Viewing ${launch.statusLabel} launch on the Launchpad.`,
+        hash: "",
+        launchAddress: launch.address,
+        error: "",
+      };
+      renderApp();
+      window.setTimeout(() => {
+        document.querySelector(".detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+      showToast(`${launch.statusLabel} launch opened on the Launchpad.`);
+      break;
+    }
     case "approve-sale-token":
       await runTestnetLaunchAction("approveSaleToken");
       break;
