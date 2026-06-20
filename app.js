@@ -5024,11 +5024,13 @@ function renderTestnetSetupGuide(launch, canRunVaultActions) {
     ["approve-testnet-launch", "Approve Launch", "Mark the reviewed launch as approved before it can go live."],
     ["open-testnet-launch", "Open Launch", "Start accepting buyer deposits in mock USDT."],
   ];
-  const ownerNote = canRunVaultActions
-    ? nextKey
+  const ownerNote = nextKey
+    ? canRunVaultActions
       ? `Press ${nextLabels[nextKey]} next, then confirm the wallet transaction.`
-      : "This launch is already open or complete. Go to Launchpad to view it."
-    : "Connect the creator wallet on BNB testnet to run the setup buttons.";
+      : "Connect the creator wallet on BNB testnet to run the setup buttons."
+    : launch.statusLabel === "Live"
+      ? "This launch is live and accepting deposits. Go to Launchpad to monitor contributions."
+      : "This launch is already finalized or in refunds. Go to Launchpad to view it.";
 
   return `
     <div class="setup-guide">
@@ -5075,7 +5077,7 @@ function renderTestnetSetupButtons(launch, canRunVaultActions) {
   return `
     <button class="${setupButtonClass("approve-sale-token", nextKey)}" type="button" data-action="approve-sale-token" ${canApproveOrFund ? "" : "disabled"}>1. Approve Sale Tokens</button>
     <button class="${setupButtonClass("fund-sale-tokens", nextKey)}" type="button" data-action="fund-sale-tokens" ${canApproveOrFund ? "" : "disabled"}>2. Fund Vault</button>
-    <button class="${setupButtonClass("approve-testnet-launch", nextKey, "gold")}" type="button" data-action="approve-testnet-launch" ${canApproveLaunch ? "" : "disabled"}>3. Approve Launch</button>
+    <button class="${setupButtonClass("approve-testnet-launch", nextKey)}" type="button" data-action="approve-testnet-launch" ${canApproveLaunch ? "" : "disabled"}>3. Approve Launch</button>
     <button class="${setupButtonClass("open-testnet-launch", nextKey)}" type="button" data-action="open-testnet-launch" ${canOpenLaunch ? "" : "disabled"}>4. Open Launch</button>
   `;
 }
