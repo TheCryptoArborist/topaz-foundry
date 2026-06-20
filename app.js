@@ -2183,7 +2183,8 @@ async function readLaunchFactory() {
   }
 
   const launchesOnChain = [];
-  const start = Math.max(0, launchCount - 5);
+  const recentLaunchReadLimit = 12;
+  const start = Math.max(0, launchCount - recentLaunchReadLimit);
   const launchRefs = [];
   for (let index = start; index < launchCount; index += 1) {
     const launchAddress = decodeAddress(await ethCall(factory, `${contractSelectors.allLaunches}${encodeUint256(index)}`));
@@ -4059,6 +4060,22 @@ function testnetLaunchRows() {
   ]);
 }
 
+function renderLatestTokenReminder() {
+  const tokenAddress = state.testTokenTx.tokenAddress;
+  if (!isEvmAddress(tokenAddress) || isEvmAddress(state.testnetLaunchTx.launchAddress)) return "";
+
+  return `
+    <section class="panel pad callout">
+      <h3>Token Deployed, Launch Not Created Yet</h3>
+      <p class="muted">A token contract does not show in Launchpad by itself. It appears after you create a Draft SaleVault from the token address.</p>
+      <div class="review-list">
+        <div class="review-row"><span>Latest token</span><strong>${renderAddressLink(tokenAddress)}</strong></div>
+        <div class="review-row"><span>Next step</span><strong>Create Draft On Testnet</strong></div>
+      </div>
+    </section>
+  `;
+}
+
 function renderTestnetResumePanel() {
   if (isEvmAddress(state.testnetLaunchTx.launchAddress)) {
     return renderTestnetLaunchWriter();
@@ -4088,6 +4105,7 @@ function renderTestnetView() {
         ["LaunchFactory count", launchCountLabel, state.testnetLastUpdated ? `Last read ${state.testnetLastUpdated}` : "Refresh to read chain"],
         ["Mode", "Read + resume", "Continue setup from SaleVault rows"],
       ])}
+      ${renderLatestTokenReminder()}
       ${state.testnetError ? `<section class="panel pad warning-panel"><strong>Testnet read issue</strong><p class="muted">${state.testnetError}</p></section>` : ""}
       <section class="panel pad">
         <div class="panel-title">
@@ -4117,7 +4135,7 @@ function renderTestnetView() {
       <section class="panel pad">
         <div class="panel-title">
           <h3>Latest Sale Vaults</h3>
-          <span class="micro">Most recent contracts from LaunchFactory</span>
+          <span class="micro">Newest SaleVaults from LaunchFactory; token-only deploys appear after Draft creation</span>
         </div>
         ${renderDataTable(["Launch", "Status", "Raised", "Refund total", "Next", "Action"], testnetLaunchRows())}
       </section>
