@@ -2756,9 +2756,10 @@ function platformFeeRows() {
 function finalizationPlan(launch, liquidityPercent = liquidityPercentFor(launch)) {
   const finalRaise = finalRaiseFor(launch) || launch.raised || launch.goal;
   const successFee = launch.status === "refunding" || finalRaise < softCapFor(launch) ? 0 : platformFeeFor(finalRaise);
-  const netRaise = Math.max(0, finalRaise - successFee);
-  const quoteToLp = Math.round((netRaise * liquidityPercent) / 100);
-  const creatorProceeds = Math.max(0, netRaise - quoteToLp);
+  const failedRefund = launch.status === "refunding";
+  const netRaise = failedRefund ? 0 : Math.max(0, finalRaise - successFee);
+  const quoteToLp = failedRefund ? 0 : Math.round((netRaise * liquidityPercent) / 100);
+  const creatorProceeds = failedRefund ? 0 : Math.max(0, netRaise - quoteToLp);
   const poolValue = quoteToLp * 2;
   const pair = `${launch.symbol}/${quoteAsset(launch)}`;
   return {
@@ -4206,6 +4207,10 @@ function renderPortfolioView() {
 function renderProofCenterView() {
   const launch = currentLaunch();
   const plan = finalizationPlan(launch);
+  const liquidityMetric =
+    launch.status === "refunding"
+      ? ["Topaz Pair", "Not created"]
+      : ["Topaz Liquidity", money(plan.quoteToLp)];
   const verificationTitle =
     launch.status === "refunding"
       ? `${launch.name} Refund Verification`
@@ -4248,7 +4253,7 @@ function renderProofCenterView() {
             <div class="metric"><span>Status</span><strong>${statusLabel(launch.status)}</strong></div>
             <div class="metric"><span>Raised</span><strong>${money(launch.raised)}</strong></div>
             <div class="metric"><span>Platform Fee</span><strong>${money(plan.successFee)}</strong></div>
-            <div class="metric"><span>Topaz Liquidity</span><strong>${money(plan.quoteToLp)}</strong></div>
+            <div class="metric"><span>${liquidityMetric[0]}</span><strong>${liquidityMetric[1]}</strong></div>
             <div class="metric"><span>Buyer Action</span><strong>${primaryActionFor(launch).button}</strong></div>
           </div>
         </section>
