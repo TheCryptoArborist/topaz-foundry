@@ -395,6 +395,17 @@ h3 {
   box-shadow: 0 12px 28px rgba(20, 168, 130, 0.24);
 }
 
+.button.wallet-disconnect {
+  border-color: rgba(255, 120, 120, 0.42);
+  background: rgba(255, 120, 120, 0.08);
+  color: #ffd9d9;
+}
+
+.button.wallet-disconnect:hover {
+  border-color: rgba(255, 150, 150, 0.7);
+  background: rgba(255, 120, 120, 0.14);
+}
+
 .button.gold {
   border-color: rgba(242, 200, 75, 0.45);
   background: rgba(242, 200, 75, 0.11);

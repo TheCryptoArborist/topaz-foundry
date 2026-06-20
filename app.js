@@ -469,6 +469,7 @@ const state = {
   tab: "live",
   selectedId: "aurora",
   connected: false,
+  walletManuallyDisconnected: false,
   walletAddress: "",
   walletChainId: "",
   walletStatus: "Not connected",
@@ -877,6 +878,7 @@ function isEvmAddress(address) {
 }
 
 const tokenLogoStorageKey = "arbor-foundry-token-logos-v1";
+const walletDisconnectStorageKey = "arbor-foundry-wallet-disconnected-v1";
 let activeTokenLogoReadId = 0;
 
 function canUseLocalStorage() {
@@ -884,6 +886,28 @@ function canUseLocalStorage() {
     return typeof window !== "undefined" && Boolean(window.localStorage);
   } catch (error) {
     return false;
+  }
+}
+
+function walletDisconnectStored() {
+  if (!canUseLocalStorage()) return false;
+  try {
+    return window.localStorage.getItem(walletDisconnectStorageKey) === "1";
+  } catch (error) {
+    return false;
+  }
+}
+
+function setWalletDisconnectStored(disconnected) {
+  if (!canUseLocalStorage()) return;
+  try {
+    if (disconnected) {
+      window.localStorage.setItem(walletDisconnectStorageKey, "1");
+    } else {
+      window.localStorage.removeItem(walletDisconnectStorageKey);
+    }
+  } catch (error) {
+    // Disconnect still works for the current page even if storage is unavailable.
   }
 }
 
@@ -1005,7 +1029,16 @@ function isWalletOnBnbMainnet() {
 
 function walletButtonLabel() {
   if (!state.connected || !state.walletAddress) return "Connect Wallet";
-  return shortAddress(state.walletAddress);
+  return `Disconnect ${shortAddress(state.walletAddress)}`;
+}
+
+function walletButtonClass() {
+  return state.connected ? "button wallet-disconnect" : "button primary";
+}
+
+function walletButtonTitle() {
+  if (!state.connected || !state.walletAddress) return "Connect wallet";
+  return `Disconnect ${shortAddress(state.walletAddress)} from Arbor Foundry`;
 }
 
 function testnetNetworkLabel() {
@@ -1023,16 +1056,35 @@ function topbarNetworkLabel() {
 
 async function syncWalletState(accountMethod = "eth_accounts") {
   if (!window.ethereum) return false;
+  const requestingAccounts = accountMethod === "eth_requestAccounts";
+  if (!requestingAccounts && walletDisconnectStored()) {
+    state.walletManuallyDisconnected = true;
+    state.connected = false;
+    state.walletAddress = "";
+    state.walletChainId = "";
+    state.walletStatus = "Disconnected from Arbor Foundry.";
+    return false;
+  }
+
+  if (requestingAccounts) {
+    state.walletManuallyDisconnected = false;
+    setWalletDisconnectStored(false);
+  }
+
   const accounts = await window.ethereum.request({ method: accountMethod });
   state.connected = Boolean(accounts.length);
   state.walletAddress = accounts[0] || "";
 
   if (!state.connected) {
+    state.walletManuallyDisconnected = false;
+    setWalletDisconnectStored(false);
     state.walletChainId = "";
     state.walletStatus = "Not connected";
     return false;
   }
 
+  state.walletManuallyDisconnected = false;
+  setWalletDisconnectStored(false);
   state.walletChainId = await window.ethereum.request({ method: "eth_chainId" });
   state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
   return true;
@@ -2382,6 +2434,8 @@ async function connectWallet() {
   }
 
   try {
+    state.walletManuallyDisconnected = false;
+    setWalletDisconnectStored(false);
     await syncWalletState("eth_requestAccounts");
     renderApp();
     showToast(isWalletOnBnbTestnet() ? "Wallet connected to BNB testnet." : "Wallet connected. Switch to BNB testnet before transactions.");
@@ -2391,6 +2445,38 @@ async function connectWallet() {
     renderApp();
     showToast("Wallet connection was not completed.");
   }
+}
+
+async function disconnectWallet() {
+  const connectedAddress = state.walletAddress;
+  state.walletManuallyDisconnected = true;
+  setWalletDisconnectStored(true);
+  state.connected = false;
+  state.walletAddress = "";
+  state.walletChainId = "";
+  state.walletStatus = "Disconnected from Arbor Foundry.";
+  state.wizardOpen = false;
+  renderApp();
+
+  let revokedPermission = false;
+  if (window.ethereum?.request) {
+    try {
+      await window.ethereum.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }],
+      });
+      revokedPermission = true;
+    } catch (error) {
+      revokedPermission = false;
+    }
+  }
+
+  const walletLabel = connectedAddress ? ` ${shortAddress(connectedAddress)}` : "";
+  showToast(
+    revokedPermission
+      ? `Wallet${walletLabel} disconnected.`
+      : `Wallet${walletLabel} disconnected from Arbor Foundry.`,
+  );
 }
 
 async function switchToBnbTestnet() {
@@ -3216,7 +3302,7 @@ function renderTopbar() {
       <div class="topbar-actions">
         ${networkPill}
         ${creatorAction}
-        <button class="button primary" type="button" data-action="connect-wallet">
+        <button class="${walletButtonClass()}" type="button" data-action="connect-wallet" title="${walletButtonTitle()}">
           ${icons.wallet}
           ${walletButtonLabel()}
         </button>
@@ -4089,7 +4175,7 @@ function renderTestnetActions() {
     <div class="header-actions">
       <button class="button ghost" type="button" data-action="refresh-testnet">${state.testnetLoading ? "Refreshing" : "Refresh reads"}</button>
       ${state.connected && !isWalletOnBnbTestnet() ? '<button class="button gold" type="button" data-action="switch-testnet">Switch to testnet</button>' : ""}
-      <button class="button primary" type="button" data-action="connect-wallet">${icons.wallet} ${walletButtonLabel()}</button>
+      <button class="${walletButtonClass()}" type="button" data-action="connect-wallet" title="${walletButtonTitle()}">${icons.wallet} ${walletButtonLabel()}</button>
     </div>
   `;
 }
@@ -4272,7 +4358,7 @@ function renderPortfolioView() {
       ${renderPageHeader(
         "My Contributions",
         "Track deposits, claimable tokens, refunds, and post-launch records from one buyer portfolio.",
-        '<button class="button primary" type="button" data-action="connect-wallet">' + icons.wallet + (state.connected ? " Wallet Connected" : " Connect Wallet") + "</button>",
+        `<button class="${walletButtonClass()}" type="button" data-action="connect-wallet" title="${walletButtonTitle()}">${icons.wallet} ${walletButtonLabel()}</button>`,
       )}
       ${renderKpiGrid([
         ["Deposited", "2,730 USDT", "Self-serve launches"],
@@ -5644,7 +5730,11 @@ async function handleClick(event) {
 
   switch (target.dataset.action) {
     case "connect-wallet":
-      await connectWallet();
+      if (state.connected) {
+        await disconnectWallet();
+      } else {
+        await connectWallet();
+      }
       break;
     case "refresh-testnet":
       await refreshTestnetData();
@@ -5876,6 +5966,15 @@ if (window.ethereum) {
   });
 
   window.ethereum.on?.("chainChanged", (chainId) => {
+    if (walletDisconnectStored()) {
+      state.walletManuallyDisconnected = true;
+      state.connected = false;
+      state.walletAddress = "";
+      state.walletChainId = "";
+      state.walletStatus = "Disconnected from Arbor Foundry.";
+      renderApp();
+      return;
+    }
     state.walletChainId = chainId;
     state.walletStatus = isWalletOnBnbTestnet() ? "Connected to BNB testnet." : "Wallet connected on the wrong chain.";
     renderApp();
