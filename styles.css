@@ -130,6 +130,25 @@ button {
 
 .nav {
   display: grid;
+  gap: 12px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-label {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.nav-group-items {
+  display: grid;
   gap: 6px;
 }
 
@@ -223,6 +242,16 @@ button {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-soft);
   font-size: 13px;
+}
+
+.sidebar-role {
+  border: 1px solid rgba(54, 230, 182, 0.18);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: rgba(54, 230, 182, 0.05);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .network-pill.warn {
@@ -2053,6 +2082,14 @@ h3 {
   }
 
   .nav {
+    gap: 8px;
+  }
+
+  .nav-group {
+    gap: 5px;
+  }
+
+  .nav-group-items {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
@@ -2067,6 +2104,10 @@ h3 {
   }
 
   .sidebar-card {
+    display: none;
+  }
+
+  .sidebar-role {
     display: none;
   }
 
@@ -2165,8 +2206,11 @@ h3 {
   }
 
   .nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
+  }
+
+  .nav-group-items {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .nav-button {
@@ -2342,6 +2386,10 @@ h3 {
   }
 
   .nav {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-group-items {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 

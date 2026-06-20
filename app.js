@@ -581,17 +581,23 @@ const statusMeta = {
 };
 
 const navItems = [
-  { key: "launchpad", label: "Launchpad", icon: icons.launch },
-  { key: "testnet", label: "Testnet", icon: icons.wallet },
-  { key: "portfolio", label: "My Contributions", icon: icons.stack },
-  { key: "proof", label: "Verify Launches", icon: icons.lock },
-  { key: "integration", label: "Topaz V2", icon: icons.doc },
-  { key: "finalize", label: "Finalize", icon: icons.check },
-  { key: "voting", label: "veTOPAZ Voting", icon: icons.vote },
-  { key: "rewards", label: "Rewards", icon: icons.chart },
-  { key: "locks", label: "LP Locks", icon: icons.lock },
-  { key: "projects", label: "Project Review", icon: icons.doc },
-  { key: "admin", label: "Admin", icon: icons.settings },
+  { key: "launchpad", label: "Launchpad", icon: icons.launch, role: "public" },
+  { key: "portfolio", label: "My Contributions", icon: icons.stack, role: "public" },
+  { key: "proof", label: "Verify Launches", icon: icons.lock, role: "public" },
+  { key: "integration", label: "Topaz V2", icon: icons.doc, role: "public" },
+  { key: "voting", label: "veTOPAZ Voting", icon: icons.vote, role: "public" },
+  { key: "rewards", label: "Rewards", icon: icons.chart, role: "public" },
+  { key: "locks", label: "LP Locks", icon: icons.lock, role: "public" },
+  { key: "testnet", label: "Testnet", icon: icons.wallet, role: "creator" },
+  { key: "finalize", label: "Finalize", icon: icons.check, role: "creator" },
+  { key: "projects", label: "Project Review", icon: icons.doc, role: "admin" },
+  { key: "admin", label: "Admin", icon: icons.settings, role: "admin" },
+];
+
+const navGroups = [
+  { key: "public", label: "Public" },
+  { key: "creator", label: "Creator Wallet" },
+  { key: "admin", label: "Admin Wallet" },
 ];
 
 const tabs = [
@@ -1921,6 +1927,61 @@ function ownerWalletReady() {
   return state.connected && isWalletOnBnbTestnet() && addressMatches(state.walletAddress, bnbTestnet.expectedOwner);
 }
 
+function adminWalletReady() {
+  return ownerWalletReady();
+}
+
+function launchCreatorWalletMatches(launch) {
+  return state.connected && isWalletOnBnbTestnet() && addressMatches(launch?.config?.creator, state.walletAddress);
+}
+
+function canManageLaunch(launch) {
+  if (!state.connected || !isWalletOnBnbTestnet()) return false;
+  if (adminWalletReady()) return true;
+  return launchCreatorWalletMatches(launch);
+}
+
+function creatorWalletReady() {
+  if (!state.connected || !isWalletOnBnbTestnet()) return false;
+  if (adminWalletReady()) return true;
+  return (state.testnetData.launches || []).some(launchCreatorWalletMatches);
+}
+
+function navItemVisible(item) {
+  const role = item.role || "public";
+  if (role === "admin") return adminWalletReady();
+  if (role === "creator") return creatorWalletReady();
+  return true;
+}
+
+function visibleNavItems() {
+  return navItems.filter(navItemVisible);
+}
+
+function canViewNavKey(view) {
+  const item = navItems.find((navItem) => navItem.key === view);
+  return !item || navItemVisible(item);
+}
+
+function ensureVisibleView() {
+  if (!canViewNavKey(state.view)) {
+    state.view = "launchpad";
+  }
+}
+
+function walletRoleStatus() {
+  if (!state.connected) return "Connect wallet to reveal creator/admin tools.";
+  if (!isWalletOnBnbTestnet()) return "Switch to BNB testnet to check wallet role.";
+  if (adminWalletReady()) return "Admin wallet: creator and admin tools visible.";
+  if (creatorWalletReady()) return "Creator wallet: creator tools visible.";
+  return "Buyer wallet: public launch views only.";
+}
+
+function managedTestnetLaunches() {
+  const launches = state.testnetData.launches || [];
+  return adminWalletReady() ? launches : launches.filter(canManageLaunch);
+}
+
 function finalizationValidation(launch) {
   if (!isEvmAddress(launch?.address)) return { ok: false, message: "Select a testnet SaleVault first." };
   if (!ownerWalletReady()) return { ok: false, message: "Connect the owner wallet on BNB testnet." };
@@ -1970,6 +2031,13 @@ function resumeTestnetLaunch(launchAddress) {
   const launch = (state.testnetData.launches || []).find((item) => addressMatches(item.address, launchAddress));
   if (!launch) {
     showToast("Refresh testnet reads, then try that SaleVault again.");
+    return;
+  }
+
+  if (!canManageLaunch(launch)) {
+    state.view = "launchpad";
+    renderApp();
+    showToast("Only the creator or admin wallet can manage that SaleVault.");
     return;
   }
 
@@ -2959,6 +3027,7 @@ function testnetLaunchesForLaunchpad() {
       id: `testnet-${launch.index}`,
       name: testnetLaunchName(launch),
       symbol,
+      creator: config.creator || "",
       status,
       color: colors[launch.index % colors.length],
       logoDataUrl,
@@ -3077,6 +3146,13 @@ function renderProjectMark(launch, size = "small") {
 }
 
 function renderSidebar() {
+  const groups = navGroups
+    .map((group) => ({
+      ...group,
+      items: visibleNavItems().filter((item) => (item.role || "public") === group.key),
+    }))
+    .filter((group) => group.items.length);
+
   return `
     <aside class="sidebar">
       <div class="brand">
@@ -3087,17 +3163,29 @@ function renderSidebar() {
         </div>
       </div>
       <nav class="nav" aria-label="Prototype navigation">
-        ${navItems
+        ${groups
           .map(
-            (item) => `
-              <button class="nav-button ${state.view === item.key ? "active" : ""}" type="button" data-view="${item.key}">
-                ${item.icon}
-                <span>${item.label}</span>
-              </button>
+            (group) => `
+              <div class="nav-group">
+                <div class="nav-label">${group.label}</div>
+                <div class="nav-group-items">
+                  ${group.items
+                    .map(
+                      (item) => `
+                        <button class="nav-button ${state.view === item.key ? "active" : ""}" type="button" data-view="${item.key}">
+                          ${item.icon}
+                          <span>${item.label}</span>
+                        </button>
+                      `,
+                    )
+                    .join("")}
+                </div>
+              </div>
             `,
           )
           .join("")}
       </nav>
+      <div class="sidebar-role">${walletRoleStatus()}</div>
       <div class="sidebar-card">
         <div class="label">veTOPAZ Balance</div>
         <strong>12,480.75</strong>
@@ -3111,6 +3199,9 @@ function renderSidebar() {
 
 function renderTopbar() {
   const wrongChain = state.connected && !isWalletOnBnbTestnet();
+  const creatorAction = creatorWalletReady()
+    ? `<button class="button gold" type="button" data-action="open-wizard">${icons.plus} Create Launch</button>`
+    : "";
   const networkPill = wrongChain
     ? `<button class="network-pill warn action" type="button" data-action="switch-testnet" title="Switch wallet to BNB Smart Chain Testnet">
         <span class="dot"></span>${topbarNetworkLabel()}
@@ -3124,7 +3215,7 @@ function renderTopbar() {
       <div class="tagline">Independent launches. Liquidity rooted on Topaz.</div>
       <div class="topbar-actions">
         ${networkPill}
-        <button class="button gold" type="button" data-action="open-wizard">${icons.plus} Create Launch</button>
+        ${creatorAction}
         <button class="button primary" type="button" data-action="connect-wallet">
           ${icons.wallet}
           ${walletButtonLabel()}
@@ -4031,9 +4122,9 @@ function testnetCheckRows() {
 }
 
 function testnetLaunchRows() {
-  const rows = state.testnetData.launches || [];
+  const rows = managedTestnetLaunches();
   if (!rows.length) {
-    return [["No sale vaults read yet", "Run refresh after rehearsals", "0 USDT", "0 USDT", "Waiting", "Refresh"]];
+    return [[adminWalletReady() ? "No sale vaults read yet" : "No creator SaleVaults found", "Run refresh after rehearsals", "0 USDT", "0 USDT", "Waiting", "Refresh"]];
   }
 
   return rows.map((launch) => [
@@ -5460,6 +5551,8 @@ function renderToast() {
 }
 
 function renderApp() {
+  ensureVisibleView();
+
   app.innerHTML = `
     <div class="app-shell">
       ${renderSidebar()}
@@ -5501,6 +5594,12 @@ async function handleClick(event) {
 
   const view = target.dataset.view;
   if (view) {
+    if (!canViewNavKey(view)) {
+      state.view = "launchpad";
+      renderApp();
+      showToast("That tool is only visible to the required wallet role.");
+      return;
+    }
     state.view = view;
     if (view === "launchpad") ensureSelectedLaunchVisible(true);
     renderApp();
@@ -5646,6 +5745,10 @@ async function handleClick(event) {
       copyText(launchShareUrl(currentLaunch()), "Launch link copied.");
       break;
     case "open-wizard":
+      if (!creatorWalletReady()) {
+        showToast(state.connected ? "Connect the creator wallet for launch setup tools." : "Connect a creator wallet to create or manage a launch.");
+        break;
+      }
       state.wizardOpen = true;
       renderApp();
       break;
