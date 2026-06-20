@@ -529,6 +529,11 @@ const state = {
     hash: "",
     error: "",
   },
+  lpFeeClaimTx: {
+    status: "",
+    hash: "",
+    error: "",
+  },
   finalizationTx: {
     status: "",
     hash: "",
@@ -722,6 +727,7 @@ const contractSelectors = {
   enableRefunds: "0x8c52f467",
   topazFinalizeLaunch: "0x58e76b9e",
   topazGetPool: "0x79bc57d5",
+  feeLockerClaimAndSplitFees: "0xa972f730",
   erc20Name: "0x06fdde03",
   erc20Symbol: "0x95d89b41",
 };
@@ -1909,6 +1915,74 @@ async function claimRefundFromSaleVault() {
   } catch (error) {
     const message = error.message || "Refund claim was not completed.";
     state.claimTx = { ...state.claimTx, status: "Refund claim not completed.", error: message };
+    renderApp();
+    showToast(message);
+  }
+}
+
+function lpFeeClaimEligibleLaunches() {
+  return launchpadLaunches().filter((launch) => {
+    const proof = testnetProofFor(launch);
+    return launch.testnet && launch.status === "finalized" && isEvmAddress(proof?.pair);
+  });
+}
+
+function lpFeeClaimTargetLaunch() {
+  const selected = currentLaunch();
+  const selectedProof = testnetProofFor(selected);
+  if (selected?.testnet && selected.status === "finalized" && isEvmAddress(selectedProof?.pair)) return selected;
+  return lpFeeClaimEligibleLaunches()[0] || selected;
+}
+
+function lpFeeClaimValidation(launch = lpFeeClaimTargetLaunch()) {
+  if (!adminWalletReady()) return { ok: false, message: "Connect the Arbor Foundry admin wallet on BNB testnet." };
+  if (!launch?.testnet?.vault) return { ok: false, message: "Select a finalized testnet SaleVault first." };
+  if (launch.status !== "finalized") return { ok: false, message: "LP fees can be claimed after a successful finalization." };
+
+  const proof = testnetProofFor(launch);
+  if (!isEvmAddress(proof?.pair)) return { ok: false, message: "This finalized launch does not have a saved Topaz pair yet." };
+  if (isEvmAddress(proof.lpReceiver) && !addressMatches(proof.lpReceiver, bnbTestnet.contracts.lpLocker)) {
+    return { ok: false, message: "This launch is not registered to the Arbor Foundry fee-split locker." };
+  }
+
+  return { ok: true, message: `Ready to claim and split LP fees for ${launch.name}.` };
+}
+
+async function claimLpFeesFromLocker() {
+  const launch = lpFeeClaimTargetLaunch();
+  const validation = lpFeeClaimValidation(launch);
+  if (!validation.ok) {
+    state.lpFeeClaimTx = { status: "LP fee claim not ready.", hash: "", error: validation.message };
+    renderApp();
+    showToast(validation.message);
+    return;
+  }
+
+  const pair = testnetProofFor(launch).pair;
+
+  try {
+    state.lpFeeClaimTx = { status: "Claim LP fees: waiting for admin wallet approval...", hash: "", error: "" };
+    renderApp();
+    const hash = await sendEvmTransaction(
+      bnbTestnet.contracts.lpLocker,
+      `${contractSelectors.feeLockerClaimAndSplitFees}${encodeAbiAddress(pair)}`,
+    );
+    state.lpFeeClaimTx = { status: "LP fee claim submitted. Waiting for confirmation...", hash, error: "" };
+    renderApp();
+    const receipt = await waitForTransactionReceipt(hash);
+    if (receipt && !receiptSucceeded(receipt)) throw new Error("LP fee claim transaction reverted.");
+
+    state.lpFeeClaimTx = {
+      status: `LP fee claim confirmed for ${launch.name}. Any available token0/token1 fees were split 80% to the creator and 20% to Arbor Foundry.`,
+      hash,
+      error: "",
+    };
+    await refreshTestnetData(true);
+    renderApp();
+    showToast("LP fee claim confirmed on BNB testnet.");
+  } catch (error) {
+    const message = error.message || "LP fee claim was not completed.";
+    state.lpFeeClaimTx = { ...state.lpFeeClaimTx, status: "LP fee claim not completed.", error: message };
     renderApp();
     showToast(message);
   }
@@ -4929,6 +5003,48 @@ function renderProjectsView() {
   `;
 }
 
+function renderAdminLpFeeClaimPanel() {
+  if (!adminWalletReady()) return "";
+
+  const launch = lpFeeClaimTargetLaunch();
+  const proof = testnetProofFor(launch) || {};
+  const validation = lpFeeClaimValidation(launch);
+  const tx = state.lpFeeClaimTx;
+  const pair = isEvmAddress(proof.pair) ? proof.pair : "";
+  const vault = launch?.testnet?.vault || launch?.address || "";
+  const creator = launch?.creator || launch?.config?.creator || "";
+
+  return `
+    <section class="panel pad callout">
+      <div class="panel-title">
+        <h3>Claim LP Fees</h3>
+        <span class="status live">Admin wallet only</span>
+      </div>
+      <div class="assist-note">
+        <strong>What this does</strong>
+        <span>Claims any available fees from the finalized Topaz pair through the FeeSplitLPLocker, then splits them 80% to the project creator and 20% to Arbor Foundry.</span>
+      </div>
+      <div class="review-list">
+        <div class="review-row"><span>Selected launch</span><strong>${launch ? escapeHtml(launch.name) : "None selected"}</strong></div>
+        <div class="review-row"><span>SaleVault</span><strong>${vault ? renderAddressLink(vault) : "Not available"}</strong></div>
+        <div class="review-row"><span>Topaz pair</span><strong>${pair ? renderAddressLink(pair) : "Not available"}</strong></div>
+        <div class="review-row"><span>Fee-split locker</span><strong>${renderAddressLink(bnbTestnet.contracts.lpLocker)}</strong></div>
+        <div class="review-row"><span>Creator receiver</span><strong>${creator ? renderAddressLink(creator) : "Launch creator"}</strong></div>
+        <div class="review-row"><span>Arbor receiver</span><strong>${renderAddressLink(bnbTestnet.platformTreasury)}</strong></div>
+        <div class="review-row"><span>Split rule</span><strong>${platformEconomics.lpFeeSplit}</strong></div>
+      </div>
+      <div class="success-note show ${validation.ok ? "" : "warn"}">${escapeHtml(validation.message)}</div>
+      <div class="success-note ${tx.status || tx.error ? "show" : ""} ${tx.error ? "warn" : ""}">
+        ${escapeHtml(tx.error || tx.status)}
+        ${tx.hash ? `<br><a href="${explorerTxLink(tx.hash)}" target="_blank" rel="noreferrer">View LP fee claim transaction</a>` : ""}
+      </div>
+      <div class="tx-actions finalization-actions">
+        <button class="button gold" type="button" data-action="claim-lp-fees" ${validation.ok ? "" : "disabled"}>Claim & Split LP Fees</button>
+      </div>
+    </section>
+  `;
+}
+
 function renderAdminView() {
   return `
     <div class="page-stack">
@@ -4946,6 +5062,7 @@ function renderAdminView() {
         </div>
         ${renderDataTable(["Metric", "Value", "Meaning"], adminAccountingRows())}
       </section>
+      ${renderAdminLpFeeClaimPanel()}
       <div class="split-layout wide-left">
         <section class="panel pad">
           <div class="panel-title">
@@ -5809,6 +5926,9 @@ async function handleClick(event) {
       break;
     case "claim-token":
       await claimTokensFromSaleVault();
+      break;
+    case "claim-lp-fees":
+      await claimLpFeesFromLocker();
       break;
     case "watch-launch":
       showToast("Launch watch captured. Production mode would save a reminder for this project.");
