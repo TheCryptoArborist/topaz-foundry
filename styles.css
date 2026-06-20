@@ -1781,6 +1781,117 @@ h3 {
   color: var(--text-soft);
 }
 
+.setup-guide {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(54, 230, 182, 0.32);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: rgba(54, 230, 182, 0.08);
+}
+
+.setup-guide-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.setup-guide-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.setup-guide-head strong {
+  color: var(--green);
+  font-size: 13px;
+}
+
+.setup-guide-head span:not(.status) {
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.setup-step-list {
+  display: grid;
+  gap: 7px;
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  background: rgba(5, 12, 14, 0.42);
+}
+
+.setup-step.next {
+  border-color: rgba(54, 230, 182, 0.56);
+  background: rgba(54, 230, 182, 0.1);
+}
+
+.setup-step.done {
+  border-color: rgba(131, 227, 110, 0.36);
+}
+
+.setup-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.setup-step.next .setup-step-number {
+  background: rgba(54, 230, 182, 0.18);
+  color: var(--teal);
+}
+
+.setup-step.done .setup-step-number {
+  background: rgba(131, 227, 110, 0.16);
+  color: var(--green);
+}
+
+.setup-step strong,
+.setup-step small {
+  display: block;
+}
+
+.setup-step strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.setup-step small {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.setup-step em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.setup-step.next em,
+.setup-step.done em {
+  color: var(--teal);
+}
+
 .missing-item {
   display: flex;
   justify-content: space-between;
@@ -2078,8 +2189,22 @@ h3 {
   .wizard-help,
   .wizard-steps,
   .contract-input-row,
+  .setup-guide-head,
   .tx-actions {
     grid-template-columns: 1fr;
+  }
+
+  .setup-guide-head {
+    display: grid;
+  }
+
+  .setup-step {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .setup-step em {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .metrics {

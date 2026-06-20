@@ -4959,6 +4959,127 @@ function renderMissingLaunchFields(issues) {
   `;
 }
 
+function setupActionRecentlyConfirmed(label, launch) {
+  return (
+    Boolean(launch) &&
+    addressMatches(state.testnetLaunchTx.launchAddress, launch.address) &&
+    state.testnetLaunchTx.status === `${label}: confirmed.`
+  );
+}
+
+function testnetSetupNextActionKey(launch) {
+  if (!launch) return "";
+  const status = launch.statusLabel;
+
+  if (["Live", "Finalized", "Refunding"].includes(status)) return "";
+  if (!launch.saleTokensFunded) {
+    return setupActionRecentlyConfirmed("Sale token approval", launch) ? "fund-sale-tokens" : "approve-sale-token";
+  }
+  if (status === "Draft") return "approve-testnet-launch";
+  if (["Approved", "Upcoming"].includes(status)) return "open-testnet-launch";
+  return "";
+}
+
+function testnetSetupStepState(stepKey, launch) {
+  if (!launch) return "waiting";
+  const status = launch.statusLabel;
+  const nextKey = testnetSetupNextActionKey(launch);
+  const isLiveOrClosed = ["Live", "Finalized", "Refunding"].includes(status);
+  const isApprovedOrLater = ["Approved", "Upcoming", "Live", "Finalized", "Refunding"].includes(status);
+  const saleTokenApproved = setupActionRecentlyConfirmed("Sale token approval", launch);
+  const doneByStep = {
+    "approve-sale-token": launch.saleTokensFunded || saleTokenApproved || isApprovedOrLater,
+    "fund-sale-tokens": launch.saleTokensFunded || isApprovedOrLater,
+    "approve-testnet-launch": isApprovedOrLater,
+    "open-testnet-launch": isLiveOrClosed,
+  };
+
+  if (doneByStep[stepKey]) return "done";
+  if (stepKey === nextKey) return "next";
+  return "waiting";
+}
+
+function renderTestnetSetupGuide(launch, canRunVaultActions) {
+  if (!launch) {
+    return `
+      <div class="setup-guide">
+        <div class="setup-guide-head">
+          <strong>Draft created. Refresh reads to load setup steps.</strong>
+          <span>Click Refresh Reads on the Testnet page, then continue setup from the SaleVault row.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const nextKey = testnetSetupNextActionKey(launch);
+  const nextLabels = {
+    "approve-sale-token": "Approve Sale Tokens",
+    "fund-sale-tokens": "Fund Vault",
+    "approve-testnet-launch": "Approve Launch",
+    "open-testnet-launch": "Open Launch",
+  };
+  const steps = [
+    ["approve-sale-token", "Approve Sale Tokens", "Give this SaleVault permission to receive the tokens being sold."],
+    ["fund-sale-tokens", "Fund Vault", "Move the sale tokens into the SaleVault so buyers can claim them later."],
+    ["approve-testnet-launch", "Approve Launch", "Mark the reviewed launch as approved before it can go live."],
+    ["open-testnet-launch", "Open Launch", "Start accepting buyer deposits in mock USDT."],
+  ];
+  const ownerNote = canRunVaultActions
+    ? nextKey
+      ? `Press ${nextLabels[nextKey]} next, then confirm the wallet transaction.`
+      : "This launch is already open or complete. Go to Launchpad to view it."
+    : "Connect the creator wallet on BNB testnet to run the setup buttons.";
+
+  return `
+    <div class="setup-guide">
+      <div class="setup-guide-head">
+        <div>
+          <strong>${nextKey ? "Draft created. Finish these steps to go live." : "Launch setup is complete."}</strong>
+          <span>${ownerNote}</span>
+        </div>
+        <span class="status ${statusKeyFromLabel(launch.statusLabel)}">${launch.statusLabel}</span>
+      </div>
+      <div class="setup-step-list">
+        ${steps
+          .map(([key, title, detail], index) => {
+            const state = testnetSetupStepState(key, launch);
+            return `
+              <div class="setup-step ${state}">
+                <span class="setup-step-number">${index + 1}</span>
+                <span>
+                  <strong>${title}</strong>
+                  <small>${detail}</small>
+                </span>
+                <em>${state === "done" ? "Done" : state === "next" ? "Next" : "Waiting"}</em>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function setupButtonClass(actionKey, nextKey, fallback = "") {
+  return `button ${actionKey === nextKey ? "primary" : fallback}`.trim();
+}
+
+function renderTestnetSetupButtons(launch, canRunVaultActions) {
+  const nextKey = testnetSetupNextActionKey(launch);
+  const saleTokensFunded = Boolean(launch?.saleTokensFunded);
+  const status = launch?.statusLabel || "";
+  const canApproveOrFund = canRunVaultActions && !saleTokensFunded;
+  const canApproveLaunch = canRunVaultActions && saleTokensFunded && status === "Draft";
+  const canOpenLaunch = canRunVaultActions && saleTokensFunded && ["Approved", "Upcoming"].includes(status);
+
+  return `
+    <button class="${setupButtonClass("approve-sale-token", nextKey)}" type="button" data-action="approve-sale-token" ${canApproveOrFund ? "" : "disabled"}>1. Approve Sale Tokens</button>
+    <button class="${setupButtonClass("fund-sale-tokens", nextKey)}" type="button" data-action="fund-sale-tokens" ${canApproveOrFund ? "" : "disabled"}>2. Fund Vault</button>
+    <button class="${setupButtonClass("approve-testnet-launch", nextKey, "gold")}" type="button" data-action="approve-testnet-launch" ${canApproveLaunch ? "" : "disabled"}>3. Approve Launch</button>
+    <button class="${setupButtonClass("open-testnet-launch", nextKey)}" type="button" data-action="open-testnet-launch" ${canOpenLaunch ? "" : "disabled"}>4. Open Launch</button>
+  `;
+}
+
 function renderTestnetRefundPanel(launch) {
   if (!launch || !["Live", "Upcoming", "Refunding"].includes(launch.statusLabel)) return "";
 
@@ -5129,15 +5250,13 @@ function renderTestnetLaunchWriter() {
           .map(([label, value]) => `<div class="review-row"><span>${label}</span><strong>${value}</strong></div>`)
           .join("")}
       </div>
-      ${renderMissingLaunchFields(errors)}
+      ${hasLaunch ? renderTestnetSetupGuide(selectedLaunch, canRunVaultActions) : renderMissingLaunchFields(errors)}
       ${tx.error ? `<div class="form-error"><span>${escapeHtml(tx.error)}</span></div>` : ""}
       <div class="tx-status">${escapeHtml(status)}</div>
       <div class="tx-actions">
-        <button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>${hasLaunch ? "Create Another Draft" : "Create Draft On Testnet"}</button>
-        <button class="button" type="button" data-action="approve-sale-token" ${canRunVaultActions ? "" : "disabled"}>Approve Sale Tokens</button>
-        <button class="button" type="button" data-action="fund-sale-tokens" ${canRunVaultActions ? "" : "disabled"}>Fund Vault</button>
-        <button class="button gold" type="button" data-action="approve-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Approve Launch</button>
-        <button class="button primary" type="button" data-action="open-testnet-launch" ${canRunVaultActions ? "" : "disabled"}>Open Launch</button>
+        ${hasLaunch
+          ? renderTestnetSetupButtons(selectedLaunch, canRunVaultActions)
+          : `<button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>Create Draft On Testnet</button>`}
       </div>
       ${renderTestnetRefundPanel(selectedLaunch)}
       ${renderTestnetFinalizationPanel(selectedLaunch)}
@@ -5261,11 +5380,18 @@ function renderWizardContent() {
 }
 
 function wizardPrimaryLabel() {
+  if (state.wizardStep === wizardSteps.length - 1 && isEvmAddress(state.testnetLaunchTx.launchAddress)) {
+    return "Close";
+  }
   return state.wizardStep === wizardSteps.length - 1 ? "Create Draft On Testnet" : "Continue";
 }
 
 function wizardPrimaryDisabled() {
-  return state.wizardStep === wizardSteps.length - 1 && testnetLaunchValidation().length > 0;
+  return (
+    state.wizardStep === wizardSteps.length - 1 &&
+    !isEvmAddress(state.testnetLaunchTx.launchAddress) &&
+    testnetLaunchValidation().length > 0
+  );
 }
 
 function renderWizard() {
@@ -5485,6 +5611,9 @@ async function handleClick(event) {
     case "next-step":
       if (state.wizardStep < wizardSteps.length - 1) {
         state.wizardStep += 1;
+        renderApp();
+      } else if (isEvmAddress(state.testnetLaunchTx.launchAddress)) {
+        state.wizardOpen = false;
         renderApp();
       } else {
         await createTestnetLaunchDraft();
