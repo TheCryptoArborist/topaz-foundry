@@ -3124,7 +3124,7 @@ function renderTopbar() {
       <div class="tagline">Independent launches. Liquidity rooted on Topaz.</div>
       <div class="topbar-actions">
         ${networkPill}
-        <button class="button gold" type="button" data-action="open-wizard">${icons.plus} New launch</button>
+        <button class="button gold" type="button" data-action="open-wizard">${icons.plus} Create Launch</button>
         <button class="button primary" type="button" data-action="connect-wallet">
           ${icons.wallet}
           ${walletButtonLabel()}
