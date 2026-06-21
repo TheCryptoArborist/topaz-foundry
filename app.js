@@ -532,6 +532,7 @@ const state = {
   lpFeeClaimTx: {
     status: "",
     hash: "",
+    pair: "",
     error: "",
   },
   lpLockRegistrationTx: {
@@ -755,6 +756,7 @@ const eventTopics = {
   tokensClaimed: "0x896e034966eaaf1adc54acc0f257056febbd300c9e47182cf761982cf1f5e430",
   refundClaimed: "0x358fe4192934d3bf28ae181feda1f4bd08ca67f5e2fad55582cce5eb67304ae9",
   lockRegistered: "0x539d162ca72154e998e9fd41983eea27e1e366d274b0a78a2a289d5bd70fd37b",
+  feesClaimed: "0xd377f58cbc83f844989775f0d4bfa247dbee70bf3d851b8c5f0e0fe51d3b6ef9",
 };
 const testnetMockErc20Bytecode = "0x604060a0815234620003cb5762000bb4803803806200001e81620003cf565b928339810160a082820312620003cb5781516001600160401b0390818111620003cb57826200004f918501620003f5565b906020928385015190828211620003cb576200006d918601620003f5565b91858501519160ff83168303620003cb5760608601516001600160a01b0381169690879003620003cb5760800151938251828111620002e9575f54906001948583811c93168015620003c0575b89841014620002ca578190601f938481116200036d575b50899084831160011462000309575f92620002fd575b50505f19600383901b1c191690851b175f555b8151928311620002e9578354918483811c93168015620002de575b88841014620002ca57828285941162000275575b508791831160011462000211575f9262000205575b50505f19600383901b1c191690821b1790555b6080528062000173575b835161072c9081620004888239608051816102ff0152f35b8215620001d7575f917fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef9184845260038252858420620001b582825462000465565b9055620001c58160025462000465565b6002558551908152a35f80806200015b565b835162461bcd60e51b81526004810183905260076024820152667a65726f20746f60c81b6044820152606490fd5b015190505f806200013e565b90849350601f19831691845f52885f20925f5b8a8282106200025e575050841162000245575b505050811b01905562000151565b01515f1960f88460031b161c191690555f808062000237565b838501518655889790950194938401930162000224565b90919250845f52875f208380860160051c8201928a8710620002c0575b91869588929594930160051c01915b828110620002b157505062000129565b5f8155869550879101620002a1565b9250819262000292565b634e487b7160e01b5f52602260045260245ffd5b92607f169262000115565b634e487b7160e01b5f52604160045260245ffd5b015190505f80620000e7565b90879350601f198316915f80528b5f20925f5b8d8282106200035657505084116200033d575b505050811b015f55620000fa565b01515f1960f88460031b161c191690555f80806200032f565b8385015186558b979095019493840193016200031c565b9091505f8052895f208480850160051c8201928c8610620003b6575b918991869594930160051c01915b828110620003a7575050620000d1565b5f815585945089910162000397565b9250819262000389565b92607f1692620000ba565b5f80fd5b6040519190601f01601f191682016001600160401b03811183821017620002e957604052565b919080601f84011215620003cb5782516001600160401b038111620002e9576020906200042b601f8201601f19168301620003cf565b92818452828287010111620003cb575f5b818110620004515750825f9394955001015290565b85810183015184820184015282016200043c565b919082018092116200047357565b634e487b7160e01b5f52601160045260245ffdfe6080604081815260049182361015610015575f80fd5b5f3560e01c90816306fdde031461048e57508063095ea7b31461042057806318160ddd1461040257806323b872dd14610323578063313ce567146102e657806340c10f191461026357806370a082311461022c57806395d89b411461010a578063a9059cbb146100da5763dd62ed3e1461008d575f80fd5b346100d657806003193601126100d6576020916100a86105ac565b6100b06105c2565b6001600160a01b039182165f908152928552838320911682528352819020549051908152f35b5f80fd5b50346100d657806003193601126100d6576020906101036100f96105ac565b602435903361063c565b5160018152f35b50346100d6575f3660031901126100d6578051905f60018054908160011c9060018316928315610222575b602093848410811461020f578388529081156101f3575060011461019d575b505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b0390f35b604190634e487b7160e01b5f525260245ffd5b60015f908152929350837fb10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf65b8385106101df57505050508301015f8080610154565b8054888601830152930192849082016101c9565b60ff1916878501525050151560051b84010190505f8080610154565b602289634e487b7160e01b5f525260245ffd5b91607f1691610135565b50346100d65760203660031901126100d6576020906001600160a01b036102516105ac565b165f5260038252805f20549051908152f35b50346100d657806003193601126100d6575f7fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60206102a06105ac565b6001600160a01b031693602435906102b98615156105f9565b858552600383528085206102ce83825461062f565b90556102dc8260025461062f565b60025551908152a3005b50346100d6575f3660031901126100d6576020905160ff7f0000000000000000000000000000000000000000000000000000000000000000168152f35b50346100d65760603660031901126100d65761033d6105ac565b906103466105c2565b6044359060018060a01b03841693845f52602094868652845f20335f528652845f20548481106103d35796610380856101039798996105d8565b825f52818952875f20335f528952875f2055815f528752855f20335f528752855f20549086519182527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925883393a361063c565b855162461bcd60e51b81528089018890526009602482015268616c6c6f77616e636560b81b6044820152606490fd5b50346100d6575f3660031901126100d6576020906002549051908152f35b50346100d657806003193601126100d65760209161043c6105ac565b9060243590335f528452825f209160018060a01b031691825f52845280835f205582519081527f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925843392a35160018152f35b919050346100d6575f3660031901126100d6575f805460018160011c906001831692831561055b575b602093848410811461020f578388529081156101f3575060011461050757505050829003601f01601f191682019267ffffffffffffffff84118385101761018a5750829182610186925282610565565b5f808052929350837f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e5635b83851061054757505050508301015f8080610154565b805488860183015293019284908201610531565b91607f16916104b7565b602080825282518183018190529093925f5b82811061059857505060409293505f838284010152601f8019910116010190565b818101860151848201604001528501610577565b600435906001600160a01b03821682036100d657565b602435906001600160a01b03821682036100d657565b919082039182116105e557565b634e487b7160e01b5f52601160045260245ffd5b1561060057565b60405162461bcd60e51b81526020600482015260076024820152667a65726f20746f60c81b6044820152606490fd5b919082018092116105e557565b6001600160a01b039182169291906106558415156105f9565b1690815f5260036020528060405f2054106106c75760207fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef91835f526003825260405f206106a48282546105d8565b9055845f526003825260405f206106bc82825461062f565b9055604051908152a3565b60405162461bcd60e51b815260206004820152600760248201526662616c616e636560c81b6044820152606490fdfea264697066735822122050b11ecab6a4dc65b9df69cc3425166f94b6a3d865ab647a201facedb939a73364736f6c63430008180033";
 
@@ -1994,6 +1996,40 @@ function lpLockRegisteredForLaunch(launch, proof = testnetProofFor(launch)) {
   );
 }
 
+function lpFeeClaimedForLaunch(launch, proof = testnetProofFor(launch)) {
+  if (proof?.lpFeeClaimTx) return true;
+
+  return Boolean(
+    state.lpFeeClaimTx.hash &&
+      isEvmAddress(state.lpFeeClaimTx.pair) &&
+      isEvmAddress(proof?.pair) &&
+      addressMatches(state.lpFeeClaimTx.pair, proof.pair),
+  );
+}
+
+function lpFeeClaimTokenLabel(tokenAddress, launch, proof) {
+  if (isEvmAddress(tokenAddress) && addressMatches(tokenAddress, launch?.config?.saleToken)) return launch.symbol;
+  if (
+    isEvmAddress(tokenAddress) &&
+    addressMatches(tokenAddress, launch?.config?.quoteToken || bnbTestnet.contracts.mockUsdt)
+  ) {
+    return proof?.quoteSymbol || quoteAsset(launch);
+  }
+  return isEvmAddress(tokenAddress) ? shortAddress(tokenAddress) : "token";
+}
+
+function lpFeeClaimDetail(launch, proof = testnetProofFor(launch)) {
+  const amount0 = proof?.lpFeeAmount0 ?? 0n;
+  const amount1 = proof?.lpFeeAmount1 ?? 0n;
+  const token0 = lpFeeClaimTokenLabel(proof?.lpFeeToken0, launch, proof);
+  const token1 = lpFeeClaimTokenLabel(proof?.lpFeeToken1, launch, proof);
+
+  if (amount0 === 0n && amount1 === 0n) {
+    return "Claim checked successfully; no accrued LP fees were available yet.";
+  }
+  return `${proofQuantity(amount0, token0)} + ${proofQuantity(amount1, token1)} split 80/20.`;
+}
+
 function lpLockRegistrationValidation(launch = lpFeeClaimTargetLaunch()) {
   if (!adminWalletReady()) return { ok: false, message: "Connect the Arbor Foundry admin wallet on BNB testnet." };
   if (!launch?.testnet?.vault) return { ok: false, message: "Select a finalized testnet SaleVault first." };
@@ -2020,6 +2056,9 @@ function lpFeeClaimValidation(launch = lpFeeClaimTargetLaunch()) {
   }
   if (isEvmAddress(proof.lpReceiver) && !addressMatches(proof.lpReceiver, bnbTestnet.contracts.lpLocker)) {
     return { ok: false, message: "This launch is not registered to the Arbor Foundry fee-split locker." };
+  }
+  if (lpFeeClaimedForLaunch(launch, proof)) {
+    return { ok: true, message: "LP fee split is confirmed. You can run it again later after more pair fees accrue." };
   }
 
   return { ok: true, message: `Ready to claim and split LP fees for ${launch.name}.` };
@@ -2096,14 +2135,14 @@ async function claimLpFeesFromLocker() {
   const pair = testnetProofFor(launch).pair;
 
   try {
-    state.lpFeeClaimTx = { status: "Claim LP fees: waiting for admin wallet approval...", hash: "", error: "" };
+    state.lpFeeClaimTx = { status: "Claim LP fees: waiting for admin wallet approval...", hash: "", pair, error: "" };
     renderApp();
     const hash = await sendEvmTransaction(
       bnbTestnet.contracts.lpLocker,
       `${contractSelectors.feeLockerClaimAndSplitFees}${encodeAbiAddress(pair)}`,
       { gas: bnbTestnetGasLimits.lpFeeClaim },
     );
-    state.lpFeeClaimTx = { status: "LP fee claim submitted. Waiting for confirmation...", hash, error: "" };
+    state.lpFeeClaimTx = { status: "LP fee claim submitted. Waiting for confirmation...", hash, pair, error: "" };
     renderApp();
     const receipt = await waitForTransactionReceipt(hash);
     if (receipt && !receiptSucceeded(receipt)) throw new Error("LP fee claim transaction reverted.");
@@ -2111,6 +2150,7 @@ async function claimLpFeesFromLocker() {
     state.lpFeeClaimTx = {
       status: `LP fee claim confirmed for ${launch.name}. Any available token0/token1 fees were split 80% to the creator and 20% to Arbor Foundry.`,
       hash,
+      pair,
       error: "",
     };
     await refreshTestnetData(true);
@@ -2390,6 +2430,11 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
     finalizationTx: "",
     lockTx: "",
     claimTx: "",
+    lpFeeClaimTx: "",
+    lpFeeToken0: "",
+    lpFeeToken1: "",
+    lpFeeAmount0: 0n,
+    lpFeeAmount1: 0n,
     logErrors: [],
   };
 
@@ -2480,6 +2525,24 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
     } catch (error) {
       proof.logErrors.push(error.message || "Could not read LP locker registration.");
     }
+
+    const feeLogsResult = await safeReadEventLogs(
+      {
+        address: bnbTestnet.contracts.lpLocker,
+        topics: [eventTopics.feesClaimed, topicAddress(proof.pair)],
+      },
+      latestBlock,
+      fromBlock,
+    );
+    if (feeLogsResult.error) proof.logErrors.push(feeLogsResult.error);
+    const feeLog = latestLog(feeLogsResult.logs);
+    if (feeLog) {
+      proof.lpFeeClaimTx = feeLog.transactionHash;
+      proof.lpFeeToken0 = addressFromTopic(feeLog.topics?.[2]);
+      proof.lpFeeToken1 = addressFromTopic(feeLog.topics?.[3]);
+      proof.lpFeeAmount0 = decodeUint256(feeLog.data, 0);
+      proof.lpFeeAmount1 = decodeUint256(feeLog.data, 1);
+    }
   }
 
   proof.available = Boolean(
@@ -2487,6 +2550,7 @@ async function readProofTrailForSaleVault(address, config, accounting, latestBlo
       proof.finalizationTx ||
       proof.lockTx ||
       proof.claimTx ||
+      proof.lpFeeClaimTx ||
       proof.pair ||
       proof.lpReceiver,
   );
@@ -4378,7 +4442,13 @@ function renderFinalizedProofTrail(launch) {
       renderProofStatus("Locked"),
     ],
     [
-      "5. Buyer claim",
+      "5. LP fee split",
+      proof.lpFeeClaimTx ? renderTxLink(proof.lpFeeClaimTx, "LP fee split tx") : "Not checked yet",
+      proof.lpFeeClaimTx ? lpFeeClaimDetail(launch, proof) : "Admin can check and split accrued pair fees from the locker.",
+      renderProofStatus(proof.lpFeeClaimTx ? "Checked" : "Available"),
+    ],
+    [
+      "6. Buyer claim",
       renderTxLink(proof.claimTx, "Claim tx"),
       claimDetail,
       renderProofStatus(claimStatus),
@@ -5172,6 +5242,10 @@ function renderAdminLpFeeClaimPanel() {
   const lockRegistered = lpLockRegisteredForLaunch(launch, proof);
   const registrationTxLink =
     proof.lockTx || (lockRegistered && addressMatches(registerTx.pair, pair) ? registerTx.hash : "");
+  const feeClaimed = lpFeeClaimedForLaunch(launch, proof);
+  const feeClaimTxLink =
+    proof.lpFeeClaimTx || (feeClaimed && addressMatches(tx.pair, pair) ? tx.hash : "");
+  const claimButtonLabel = feeClaimed ? "2. Check & Split Again Later" : "2. Claim & Split LP Fees";
 
   return `
     <section class="panel pad callout">
@@ -5198,6 +5272,13 @@ function renderAdminLpFeeClaimPanel() {
         <div class="review-row"><span>Creator receiver</span><strong>${creator ? renderAddressLink(creator) : "Launch creator"}</strong></div>
         <div class="review-row"><span>Arbor receiver</span><strong>${renderAddressLink(bnbTestnet.platformTreasury)}</strong></div>
         <div class="review-row"><span>Split rule</span><strong>${platformEconomics.lpFeeSplit}</strong></div>
+        <div class="review-row"><span>Latest LP fee split</span><strong>${
+          feeClaimed
+            ? feeClaimTxLink
+              ? `${renderTxLink(feeClaimTxLink, "Confirmed")}<br>${escapeHtml(lpFeeClaimDetail(launch, proof))}`
+              : escapeHtml(lpFeeClaimDetail(launch, proof))
+            : "Not checked yet"
+        }</strong></div>
       </div>
       <div class="success-note show ${registrationValidation.ok ? "" : lockRegistered ? "" : "warn"}">${escapeHtml(registrationValidation.message)}</div>
       <div class="success-note ${registerTx.status || registerTx.error ? "show" : ""} ${registerTx.error ? "warn" : ""}">
@@ -5211,7 +5292,7 @@ function renderAdminLpFeeClaimPanel() {
       </div>
       <div class="tx-actions finalization-actions">
         <button class="button gold" type="button" data-action="register-lp-lock" ${registrationValidation.ok ? "" : "disabled"}>1. Register LP Lock</button>
-        <button class="button gold" type="button" data-action="claim-lp-fees" ${validation.ok ? "" : "disabled"}>2. Claim & Split LP Fees</button>
+        <button class="button gold" type="button" data-action="claim-lp-fees" ${validation.ok ? "" : "disabled"}>${claimButtonLabel}</button>
       </div>
     </section>
   `;
