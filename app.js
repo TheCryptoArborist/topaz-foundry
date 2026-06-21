@@ -676,6 +676,10 @@ const bnbTestnet = {
   proofLogChunkBlocks: 4000,
 };
 
+const bnbTestnetGasLimits = {
+  lpFeeClaim: "0x4c4b40", // 5,000,000 gas, safely below BNB testnet's RPC cap.
+};
+
 const testnetProofRegistry = {
   "0x50abab6a9fccdd53413bb471dfdaa0b71582a70e": {
     saleVault: "0x50abab6a9fccdd53413bb471dfdaa0b71582a70e",
@@ -1343,10 +1347,12 @@ async function ensureTestnetWallet() {
   if (!isWalletOnBnbTestnet()) throw new Error("Switch the wallet to BNB testnet first.");
 }
 
-async function sendEvmTransaction(to, data) {
+async function sendEvmTransaction(to, data, options = {}) {
   await ensureTestnetWallet();
   const tx = { from: state.walletAddress, data };
   if (to) tx.to = to;
+  if (options.gas) tx.gas = options.gas;
+  if (options.value) tx.value = options.value;
   return window.ethereum.request({
     method: "eth_sendTransaction",
     params: [tx],
@@ -1966,6 +1972,7 @@ async function claimLpFeesFromLocker() {
     const hash = await sendEvmTransaction(
       bnbTestnet.contracts.lpLocker,
       `${contractSelectors.feeLockerClaimAndSplitFees}${encodeAbiAddress(pair)}`,
+      { gas: bnbTestnetGasLimits.lpFeeClaim },
     );
     state.lpFeeClaimTx = { status: "LP fee claim submitted. Waiting for confirmation...", hash, error: "" };
     renderApp();
