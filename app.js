@@ -537,6 +537,8 @@ const state = {
   lpLockRegistrationTx: {
     status: "",
     hash: "",
+    pair: "",
+    saleVault: "",
     error: "",
   },
   finalizationTx: {
@@ -1976,6 +1978,22 @@ function lpLockRegisteredForProof(proof) {
   return Boolean(proof?.lockRegistered || proof?.lockTx);
 }
 
+function lpLockRegisteredForLaunch(launch, proof = testnetProofFor(launch)) {
+  if (lpLockRegisteredForProof(proof)) return true;
+
+  const registeredPair = state.lpLockRegistrationTx.pair;
+  const registeredVault = state.lpLockRegistrationTx.saleVault;
+  const saleVault = launch?.testnet?.vault || launch?.address || "";
+
+  return Boolean(
+    state.lpLockRegistrationTx.hash &&
+      isEvmAddress(registeredPair) &&
+      isEvmAddress(proof?.pair) &&
+      addressMatches(registeredPair, proof.pair) &&
+      (!isEvmAddress(registeredVault) || addressMatches(registeredVault, saleVault)),
+  );
+}
+
 function lpLockRegistrationValidation(launch = lpFeeClaimTargetLaunch()) {
   if (!adminWalletReady()) return { ok: false, message: "Connect the Arbor Foundry admin wallet on BNB testnet." };
   if (!launch?.testnet?.vault) return { ok: false, message: "Select a finalized testnet SaleVault first." };
@@ -1985,7 +2003,7 @@ function lpLockRegistrationValidation(launch = lpFeeClaimTargetLaunch()) {
   const creator = launchCreatorAddress(launch);
   if (!isEvmAddress(proof?.pair)) return { ok: false, message: "This finalized launch does not have a saved Topaz pair yet." };
   if (!isEvmAddress(creator)) return { ok: false, message: "This launch does not have a valid creator receiver address." };
-  if (lpLockRegisteredForProof(proof)) return { ok: false, message: "LP lock is registered. Claim and split LP fees next." };
+  if (lpLockRegisteredForLaunch(launch, proof)) return { ok: false, message: "LP lock is registered. Claim and split LP fees next." };
 
   return { ok: true, message: `Ready to register ${launch.name}'s Topaz pair in the fee-split locker.` };
 }
@@ -1997,7 +2015,7 @@ function lpFeeClaimValidation(launch = lpFeeClaimTargetLaunch()) {
 
   const proof = testnetProofFor(launch);
   if (!isEvmAddress(proof?.pair)) return { ok: false, message: "This finalized launch does not have a saved Topaz pair yet." };
-  if (!lpLockRegisteredForProof(proof)) {
+  if (!lpLockRegisteredForLaunch(launch, proof)) {
     return { ok: false, message: "Register the LP lock first, then claim and split LP fees." };
   }
   if (isEvmAddress(proof.lpReceiver) && !addressMatches(proof.lpReceiver, bnbTestnet.contracts.lpLocker)) {
@@ -2020,16 +2038,29 @@ async function registerLpLockForLaunch() {
   const proof = testnetProofFor(launch);
   const pair = proof.pair;
   const creator = launchCreatorAddress(launch);
+  const saleVault = launch?.testnet?.vault || launch?.address || "";
 
   try {
-    state.lpLockRegistrationTx = { status: "Register LP lock: waiting for admin wallet approval...", hash: "", error: "" };
+    state.lpLockRegistrationTx = {
+      status: "Register LP lock: waiting for admin wallet approval...",
+      hash: "",
+      pair,
+      saleVault,
+      error: "",
+    };
     renderApp();
     const hash = await sendEvmTransaction(
       bnbTestnet.contracts.lpLocker,
       buildRegisterLpLockData(pair, creator),
       { gas: bnbTestnetGasLimits.lpLockRegistration },
     );
-    state.lpLockRegistrationTx = { status: "LP lock registration submitted. Waiting for confirmation...", hash, error: "" };
+    state.lpLockRegistrationTx = {
+      status: "LP lock registration submitted. Waiting for confirmation...",
+      hash,
+      pair,
+      saleVault,
+      error: "",
+    };
     renderApp();
     const receipt = await waitForTransactionReceipt(hash);
     if (receipt && !receiptSucceeded(receipt)) throw new Error("LP lock registration transaction reverted.");
@@ -2037,6 +2068,8 @@ async function registerLpLockForLaunch() {
     state.lpLockRegistrationTx = {
       status: `LP lock registered for ${launch.name}. You can claim and split LP fees next.`,
       hash,
+      pair,
+      saleVault,
       error: "",
     };
     await refreshTestnetData(true);
@@ -5136,7 +5169,9 @@ function renderAdminLpFeeClaimPanel() {
   const pair = isEvmAddress(proof.pair) ? proof.pair : "";
   const vault = launch?.testnet?.vault || launch?.address || "";
   const creator = launchCreatorAddress(launch);
-  const lockRegistered = lpLockRegisteredForProof(proof);
+  const lockRegistered = lpLockRegisteredForLaunch(launch, proof);
+  const registrationTxLink =
+    proof.lockTx || (lockRegistered && addressMatches(registerTx.pair, pair) ? registerTx.hash : "");
 
   return `
     <section class="panel pad callout">
@@ -5155,8 +5190,8 @@ function renderAdminLpFeeClaimPanel() {
         <div class="review-row"><span>Fee-split locker</span><strong>${renderAddressLink(bnbTestnet.contracts.lpLocker)}</strong></div>
         <div class="review-row"><span>LP lock registration</span><strong>${
           lockRegistered
-            ? proof.lockTx
-              ? renderTxLink(proof.lockTx, "Registered")
+            ? registrationTxLink
+              ? renderTxLink(registrationTxLink, "Registered")
               : "Registered"
             : "Missing"
         }</strong></div>
