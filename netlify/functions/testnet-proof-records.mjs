@@ -1,9 +1,9 @@
 const rpcUrl = "https://data-seed-prebsc-1-s1.binance.org:8545/";
 
 const contracts = {
-  launchFactory: "0xC6b44e114BD06c08257aC6EEEB409c022EDCb16B",
-  topazFinalizer: "0x4CfCBC52355bFf61bC99E8F0f43B38Fe5AAEa466",
-  lpLocker: "0xB00f7c3a599a01A1A4D9312633ca86f74bdF85Ce",
+  launchFactory: "0x64CF375765d745440849150aF45F8Ac66fC0e9e4",
+  topazFinalizer: "0x7cE6146d9024a8BfBe5854D86e2689Fd8d986393",
+  lpLocker: "0xb5B157A2BFb1ef400Bb717aFD308fcD313F61eEE",
   mockUsdt: "0xA7C16a4CadA1c3bCC884904144B372aB09674A1d",
 };
 

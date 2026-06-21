@@ -1,8 +1,8 @@
 # BNB Testnet Deployment Record
 
-Last updated: June 18, 2026
+Last updated: June 21, 2026
 
-This records the current Arbor Foundry public BNB testnet rehearsal deployment. These are testnet-only contracts.
+This records the current Arbor Foundry public BNB testnet rehearsal deployment. These are testnet-only contracts. The June 21 deployment includes the latest launch-cancel, LP-lock registration, and finalization token-match safety guards.
 
 ## Network
 
@@ -26,28 +26,30 @@ This records the current Arbor Foundry public BNB testnet rehearsal deployment. 
 
 | Contract | Address |
 | --- | --- |
-| LaunchFactory | `0xC6b44e114BD06c08257aC6EEEB409c022EDCb16B` |
-| TopazFinalizer | `0x4CfCBC52355bFf61bC99E8F0f43B38Fe5AAEa466` |
-| FeeSplitLPLocker | `0xB00f7c3a599a01A1A4D9312633ca86f74bdF85Ce` |
-| VestingVault | `0x109060137eF2C77980136aC2f9e72353f2Aa45Ce` |
-| IncentiveEscrow | `0x8BAE46797C58B5870F65EB564D53CA11bb3b7a35` |
+| LaunchFactory | `0x64CF375765d745440849150aF45F8Ac66fC0e9e4` |
+| TopazFinalizer | `0x7cE6146d9024a8BfBe5854D86e2689Fd8d986393` |
+| FeeSplitLPLocker | `0xb5B157A2BFb1ef400Bb717aFD308fcD313F61eEE` |
+| VestingVault | `0x17D0A2AFF2243d99E53a30c4A9aDDDE2B40eBBF0` |
+| IncentiveEscrow | `0x403417DF68B705a7cBC54ead07436334fB993Ce1` |
 
 ## Environment Setup
 
 Use these values for verification and the fair-launch rehearsal:
 
 ```powershell
-$env:LAUNCH_FACTORY="0xC6b44e114BD06c08257aC6EEEB409c022EDCb16B"
-$env:TOPAZ_FINALIZER="0x4CfCBC52355bFf61bC99E8F0f43B38Fe5AAEa466"
-$env:LP_LOCKER="0xB00f7c3a599a01A1A4D9312633ca86f74bdF85Ce"
-$env:VESTING_VAULT="0x109060137eF2C77980136aC2f9e72353f2Aa45Ce"
-$env:INCENTIVE_ESCROW="0x8BAE46797C58B5870F65EB564D53CA11bb3b7a35"
+$env:LAUNCH_FACTORY="0x64CF375765d745440849150aF45F8Ac66fC0e9e4"
+$env:TOPAZ_FINALIZER="0x7cE6146d9024a8BfBe5854D86e2689Fd8d986393"
+$env:LP_LOCKER="0xb5B157A2BFb1ef400Bb717aFD308fcD313F61eEE"
+$env:VESTING_VAULT="0x17D0A2AFF2243d99E53a30c4A9aDDDE2B40eBBF0"
+$env:INCENTIVE_ESCROW="0x403417DF68B705a7cBC54ead07436334fB993Ce1"
 $env:ARBOR_OWNER="0xE8b63245DdDAB73C7A276818942341D8Cfb7D7A7"
 $env:PLATFORM_TREASURY="0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE"
 $env:USDT_QUOTE_TOKEN="0xA7C16a4CadA1c3bCC884904144B372aB09674A1d"
 $env:TOPAZ_FACTORY="0x3eF32427eB1eA6cE7572358e22C800CeC740292A"
 $env:TOPAZ_ROUTER="0x8a7C0b2Dc04C54eC8932Cf4cb28aC6F4f881398E"
 ```
+
+The broadcast output for this deployment is saved at `contracts\broadcast\DeployArborFoundryMvp.s.sol\97\run-latest.json`.
 
 ## Verify The Deployment
 

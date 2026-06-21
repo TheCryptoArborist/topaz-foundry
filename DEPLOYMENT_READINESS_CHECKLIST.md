@@ -8,7 +8,7 @@ Current recommendation: **No-go for mainnet deployment.**
 
 Current classification: **safe for continued testnet only.**
 
-Arbor Foundry should not move to limited mainnet smoke testing until the latest local safety fixes are redeployed and verified on testnet, the remaining edge cases are covered, and operational controls are hardened.
+Arbor Foundry should not move to limited mainnet smoke testing until the June 21 safety-guard deployment is replayed through the full testnet flow, the remaining edge cases are covered, and operational controls are hardened.
 
 ## Readiness Checklist
 
@@ -16,7 +16,7 @@ Arbor Foundry should not move to limited mainnet smoke testing until the latest 
 | --- | --- | --- |
 | Contracts compile cleanly | Partial pass | `forge build` succeeds, but lint warnings remain around timestamp comparisons and test mock unchecked transfers. |
 | Tests pass | Pass | `forge test` passes: 17 tests, 0 failures. |
-| Testnet addresses recorded | Pass, needs refresh | BNB testnet addresses are recorded in `docs/bnb-testnet-deployment-record.md`, but the deployed contracts do not automatically include the latest local safety fixes. |
+| Testnet addresses recorded | Pass | BNB testnet addresses are recorded in `docs/bnb-testnet-deployment-record.md` for the June 21 safety-guard deployment. |
 | Constructor arguments recorded | Partial | Deployment docs and scripts describe arguments, but each deployed contract should have source/constructor verification recorded. |
 | Treasury address confirmed | Partial | Testnet/frontend treasury is `0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE`; confirm final mainnet treasury before deployment. |
 | Owner/admin wallet confirmed | Partial | Testnet owner/admin is `0xE8b63245DdDAB73C7A276818942341D8Cfb7D7A7`; mainnet should use a multisig or stronger custody model. |
@@ -36,17 +36,17 @@ Recorded testnet values:
 | Owner/test wallet | `0xE8b63245DdDAB73C7A276818942341D8Cfb7D7A7` |
 | Platform treasury | `0x90f9c1c0c675A0ce9D539c540DB7F4A1f7e583AE` |
 | Mock USDT quote token | `0xA7C16a4CadA1c3bCC884904144B372aB09674A1d` |
-| LaunchFactory | `0xC6b44e114BD06c08257aC6EEEB409c022EDCb16B` |
-| TopazFinalizer | `0x4CfCBC52355bFf61bC99E8F0f43B38Fe5AAEa466` |
-| FeeSplitLPLocker | `0xB00f7c3a599a01A1A4D9312633ca86f74bdF85Ce` |
-| VestingVault | `0x109060137eF2C77980136aC2f9e72353f2Aa45Ce` |
-| IncentiveEscrow | `0x8BAE46797C58B5870F65EB564D53CA11bb3b7a35` |
+| LaunchFactory | `0x64CF375765d745440849150aF45F8Ac66fC0e9e4` |
+| TopazFinalizer | `0x7cE6146d9024a8BfBe5854D86e2689Fd8d986393` |
+| FeeSplitLPLocker | `0xb5B157A2BFb1ef400Bb717aFD308fcD313F61eEE` |
+| VestingVault | `0x17D0A2AFF2243d99E53a30c4A9aDDDE2B40eBBF0` |
+| IncentiveEscrow | `0x403417DF68B705a7cBC54ead07436334fB993Ce1` |
 
-Important: these addresses should be treated as the previous testnet deployment set. The latest local fixes should be redeployed to testnet before they are considered proven on-chain.
+Important: these addresses are the June 21 testnet deployment set. They should still be treated as testnet-only until the full successful-launch, failed-launch, and edge-case replay is complete.
 
 ## Required Before Limited Mainnet Smoke Testing
 
-- Fresh BNB testnet deployment using the latest source.
+- Fresh BNB testnet deployment using the latest source. Completed June 21, 2026; full replay still required.
 - Fresh successful-launch rehearsal.
 - Fresh failed-launch refund rehearsal.
 - Exact soft-cap and exact hard-cap tests.
