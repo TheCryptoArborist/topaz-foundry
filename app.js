@@ -524,6 +524,11 @@ const state = {
     launchAddress: "",
     error: "",
   },
+  launchApplicationTx: {
+    status: "",
+    submitted: false,
+    error: "",
+  },
   contributionTx: {
     status: "",
     hash: "",
@@ -1508,20 +1513,14 @@ function buildCreateLaunchData() {
   return `${contractSelectors.createLaunch}${words.join("")}`;
 }
 
-function testnetLaunchValidation() {
-  const issues = [];
-  const form = state.wizardForm;
+function uniqueLaunchIssues(issues) {
+  return issues.filter((issue, index, all) => all.findIndex((item) => item.title === issue.title && item.detail === issue.detail) === index);
+}
+
+function addLaunchNumberIssues(issues, form) {
   const addIssue = (step, title, detail) => {
     issues.push({ step, title, detail });
   };
-
-  if (!state.connected) addIssue(7, "Connect wallet", "Use the owner/admin wallet on BNB testnet.");
-  if (state.connected && !isWalletOnBnbTestnet()) addIssue(7, "Switch network", "Switch MetaMask to BNB Testnet 97.");
-  if (state.connected && !addressMatches(state.walletAddress, bnbTestnet.expectedOwner)) {
-    addIssue(7, "Use owner wallet", "This deployed LaunchFactory only lets the owner wallet create launches.");
-  }
-  if (!isEvmAddress(form.saleToken)) addIssue(0, "Add sale token contract", "Paste the deployed BNB testnet ERC20 token address.");
-
   try {
     const saleTokenAmount = parseUnits(form.saleTokenAmount);
     const softCap = parseUnits(form.softCap);
@@ -1536,8 +1535,69 @@ function testnetLaunchValidation() {
   } catch (error) {
     addIssue(1, "Fix sale numbers", error.message);
   }
+}
 
-  return issues.filter((issue, index, all) => all.findIndex((item) => item.title === issue.title && item.detail === issue.detail) === index);
+function testnetLaunchValidation() {
+  const issues = [];
+  const form = state.wizardForm;
+  const addIssue = (step, title, detail) => {
+    issues.push({ step, title, detail });
+  };
+
+  if (!state.connected) addIssue(7, "Connect wallet", "Use the owner/admin wallet on BNB testnet.");
+  if (state.connected && !isWalletOnBnbTestnet()) addIssue(7, "Switch network", "Switch MetaMask to BNB Testnet 97.");
+  if (state.connected && !addressMatches(state.walletAddress, bnbTestnet.expectedOwner)) {
+    addIssue(7, "Use owner wallet", "This deployed LaunchFactory only lets the owner wallet create launches.");
+  }
+  if (!isEvmAddress(form.saleToken)) addIssue(0, "Add sale token contract", "Paste the deployed BNB testnet ERC20 token address.");
+  addLaunchNumberIssues(issues, form);
+
+  return uniqueLaunchIssues(issues);
+}
+
+function launchApplicationValidation() {
+  const issues = [];
+  const form = state.wizardForm;
+  const addIssue = (step, title, detail) => {
+    issues.push({ step, title, detail });
+  };
+
+  if (!String(form.tokenName || "").trim()) addIssue(0, "Add token name", "Enter the project token name buyers will see.");
+  if (!String(form.symbol || "").trim()) addIssue(0, "Add token symbol", "Enter the token ticker buyers will see.");
+  if (!isEvmAddress(form.saleToken)) addIssue(0, "Add sale token contract", "Paste the deployed BNB testnet ERC20 token address.");
+  if (!String(form.projectSummary || "").trim()) addIssue(0, "Add project summary", "Give reviewers and buyers a short project description.");
+  if (!state.connected) addIssue(7, "Connect wallet", "Connect the wallet that should own this launch application.");
+  if (state.connected && !isWalletOnBnbTestnet()) addIssue(7, "Switch network", "Switch MetaMask to BNB Testnet 97.");
+  addLaunchNumberIssues(issues, form);
+
+  return uniqueLaunchIssues(issues);
+}
+
+function resetLaunchApplicationStatus() {
+  state.launchApplicationTx = { status: "", submitted: false, error: "" };
+}
+
+function submitLaunchApplication() {
+  const errors = launchApplicationValidation();
+  if (errors.length) {
+    state.launchApplicationTx = {
+      status: "Needs input",
+      submitted: false,
+      error: `${errors[0].title}: ${errors[0].detail}`,
+    };
+    renderApp();
+    showToast(errors[0].detail);
+    return;
+  }
+
+  state.launchApplicationTx = {
+    status: "Application ready for Arbor Foundry review. No blockchain transaction was sent yet.",
+    submitted: true,
+    error: "",
+  };
+  rememberWizardTokenLogo();
+  renderApp();
+  showToast("Launch application marked ready for review.");
 }
 
 async function createTestnetLaunchDraft() {
@@ -3639,9 +3699,8 @@ function renderSidebar() {
 
 function renderTopbar() {
   const wrongChain = state.connected && !isWalletOnBnbTestnet();
-  const creatorAction = creatorWalletReady()
-    ? `<button class="button gold" type="button" data-action="open-wizard">${icons.plus} Create Launch</button>`
-    : "";
+  const launchActionLabel = ownerWalletReady() ? "Create Launch" : "Apply to Launch";
+  const launchAction = `<button class="button gold" type="button" data-action="open-wizard">${icons.plus} ${launchActionLabel}</button>`;
   const networkPill = wrongChain
     ? `<button class="network-pill warn action" type="button" data-action="switch-testnet" title="Switch wallet to BNB Smart Chain Testnet">
         <span class="dot"></span>${topbarNetworkLabel()}
@@ -3655,7 +3714,7 @@ function renderTopbar() {
       <div class="tagline">Independent launches. Liquidity rooted on Topaz.</div>
       <div class="topbar-actions">
         ${networkPill}
-        ${creatorAction}
+        ${launchAction}
         <button class="${walletButtonClass()}" type="button" data-action="connect-wallet" title="${walletButtonTitle()}">
           ${icons.wallet}
           ${walletButtonLabel()}
@@ -5592,12 +5651,12 @@ function renderWizardHelp(step) {
   `;
 }
 
-function renderMissingLaunchFields(issues) {
+function renderMissingLaunchFields(issues, readyText = "Review the terms, then create the draft launch on BNB testnet.", missingTitle = "Required before testnet creation") {
   if (!issues.length) {
     return `
       <div class="ready-checklist">
         <strong>Required fields complete</strong>
-        <span>Review the terms, then create the draft launch on BNB testnet.</span>
+        <span>${escapeHtml(readyText)}</span>
       </div>
     `;
   }
@@ -5605,7 +5664,7 @@ function renderMissingLaunchFields(issues) {
   return `
     <div class="missing-checklist">
       <div class="missing-head">
-        <strong>Required before testnet creation</strong>
+        <strong>${escapeHtml(missingTitle)}</strong>
         <span>${issues.length} item${issues.length === 1 ? "" : "s"} left</span>
       </div>
       ${issues
@@ -5889,9 +5948,13 @@ function renderTestnetFinalizationPanel(launch) {
 function renderTestnetLaunchWriter() {
   const form = state.wizardForm;
   const tx = state.testnetLaunchTx;
-  const errors = testnetLaunchValidation();
+  const applicationTx = state.launchApplicationTx;
+  const draftErrors = testnetLaunchValidation();
+  const applicationErrors = launchApplicationValidation();
   const launchAddress = tx.launchAddress;
   const hasLaunch = isEvmAddress(launchAddress);
+  const applicationMode = !hasLaunch && !ownerWalletReady();
+  const activeIssues = applicationMode ? applicationErrors : draftErrors;
   const selectedLaunch = (state.testnetData.launches || []).find((launch) => addressMatches(launch.address, launchAddress));
   const canResumeSetup = resumableTestnetLaunch(selectedLaunch);
   const canRunVaultActions =
@@ -5901,27 +5964,55 @@ function renderTestnetLaunchWriter() {
     state.connected &&
     isWalletOnBnbTestnet() &&
     addressMatches(state.walletAddress, bnbTestnet.expectedOwner);
-  const status = tx.status || "Ready after all required fields are filled.";
-  const txLink = tx.hash ? `<a class="address-link" href="${explorerTxLink(tx.hash)}" target="_blank" rel="noreferrer">${shortAddress(tx.hash)}</a>` : "Not sent";
+  const status = hasLaunch
+    ? tx.status || "Ready after all required fields are filled."
+    : applicationMode
+      ? applicationTx.status || "Ready after all required fields are filled. Submit for review first; no blockchain transaction is sent yet."
+      : tx.status || "Ready after all required fields are filled.";
+  const txLink = applicationMode
+    ? "No on-chain tx yet"
+    : tx.hash
+      ? `<a class="address-link" href="${explorerTxLink(tx.hash)}" target="_blank" rel="noreferrer">${shortAddress(tx.hash)}</a>`
+      : "Not sent";
   const launchLink = isEvmAddress(launchAddress)
     ? `<a class="address-link" href="${explorerAddressUrl(launchAddress)}" target="_blank" rel="noreferrer">${shortAddress(launchAddress)}</a>`
     : "Created after confirmation";
+  const title = hasLaunch ? "Continue Testnet Launch" : applicationMode ? "Launch Application" : "BNB Testnet Transaction";
+  const modeLabel = hasLaunch ? "Selected SaleVault" : applicationMode ? "Public intake" : "Admin MVP path";
+  const assistCopy = hasLaunch
+    ? "This loads the selected on-chain SaleVault. You can attach a local logo, and setup buttons only enable while the launch is still Draft, Approved, or Upcoming."
+    : applicationMode
+      ? "This saves the launch details for Arbor Foundry review. After approval, the admin wallet creates the on-chain Draft SaleVault and the creator runs the setup steps."
+      : "This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches.";
+  const readyText = applicationMode
+    ? "Review the terms, then submit this launch application for Arbor Foundry review."
+    : "Review the terms, then create the draft launch on BNB testnet.";
+  const missingTitle = applicationMode ? "Required before application review" : "Required before testnet creation";
+  const walletRows = applicationMode
+    ? [
+        ["Applicant wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected"],
+        ["On-chain draft executor", shortAddress(bnbTestnet.expectedOwner)],
+      ]
+    : [
+        ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected"],
+        ["Required creator/admin", shortAddress(bnbTestnet.expectedOwner)],
+      ];
+  const activeError = applicationMode ? applicationTx.error : tx.error;
 
   return `
     <div class="testnet-writer" id="testnet-launch-writer">
       <div class="panel-title">
-        <h3>${hasLaunch ? "Continue Testnet Launch" : "BNB Testnet Transaction"}</h3>
-        <span class="micro">${hasLaunch ? "Selected SaleVault" : "Admin MVP path"}</span>
+        <h3>${title}</h3>
+        <span class="micro">${modeLabel}</span>
       </div>
       <div class="assist-note">
-        <strong>${hasLaunch ? "What this controls" : "What this sends"}</strong>
-        <span>${hasLaunch ? "This loads the selected on-chain SaleVault. You can attach a local logo, and setup buttons only enable while the launch is still Draft, Approved, or Upcoming." : "This creates a Draft SaleVault on BNB testnet through the deployed LaunchFactory. The current contract allows only the owner wallet to create launches."}</span>
+        <strong>${hasLaunch ? "What this controls" : applicationMode ? "What this submits" : "What this sends"}</strong>
+        <span>${assistCopy}</span>
       </div>
       ${hasLaunch ? renderWizardField(["Token logo", "", "file", [], "tokenLogo"]) : ""}
       <div class="review-list">
         ${[
-          ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected"],
-          ["Required creator/admin", shortAddress(bnbTestnet.expectedOwner)],
+          ...walletRows,
           ["Sale type", saleTypeLabel(form.saleType)],
           ["Sale token", isEvmAddress(form.saleToken) ? shortAddress(form.saleToken) : "Enter deployed token address"],
           ["Quote asset", `Mock USDT ${shortAddress(bnbTestnet.contracts.mockUsdt)}`],
@@ -5936,14 +6027,17 @@ function renderTestnetLaunchWriter() {
           .map(([label, value]) => `<div class="review-row"><span>${label}</span><strong>${value}</strong></div>`)
           .join("")}
       </div>
-      ${hasLaunch ? renderTestnetSetupGuide(selectedLaunch, canRunVaultActions) : renderMissingLaunchFields(errors)}
-      ${tx.error ? `<div class="form-error"><span>${escapeHtml(tx.error)}</span></div>` : ""}
+      ${hasLaunch ? renderTestnetSetupGuide(selectedLaunch, canRunVaultActions) : renderMissingLaunchFields(activeIssues, readyText, missingTitle)}
+      ${activeError ? `<div class="form-error"><span>${escapeHtml(activeError)}</span></div>` : ""}
       <div class="tx-status">${escapeHtml(status)}</div>
       <div class="tx-actions">
         ${hasLaunch
           ? renderTestnetSetupButtons(selectedLaunch, canRunVaultActions)
-          : `<button class="button primary" type="button" data-action="create-testnet-launch" ${errors.length ? "disabled" : ""}>Create Draft On Testnet</button>`}
+          : applicationMode
+            ? `<button class="button primary" type="button" data-action="submit-launch-application" ${activeIssues.length || applicationTx.submitted ? "disabled" : ""}>${applicationTx.submitted ? "Application Submitted" : "Submit Application for Review"}</button>`
+            : `<button class="button primary" type="button" data-action="create-testnet-launch" ${activeIssues.length ? "disabled" : ""}>Create Draft On Testnet</button>`}
       </div>
+      ${applicationMode ? '<p class="muted tx-footnote">The on-chain Draft SaleVault is created only after Arbor Foundry review approves the application.</p>' : ""}
       ${renderTestnetRefundPanel(selectedLaunch)}
       ${renderTestnetFinalizationPanel(selectedLaunch)}
       ${Number(form.saleType) === 0 ? "" : '<p class="muted tx-footnote">Guided sale modes can be drafted on-chain, but buyer deposits for fixed-price and liquidity-bootstrap modes still need their adapter contracts.</p>'}
@@ -6069,26 +6163,34 @@ function wizardPrimaryLabel() {
   if (state.wizardStep === wizardSteps.length - 1 && isEvmAddress(state.testnetLaunchTx.launchAddress)) {
     return "Close";
   }
-  return state.wizardStep === wizardSteps.length - 1 ? "Create Draft On Testnet" : "Continue";
+  if (state.wizardStep === wizardSteps.length - 1 && state.launchApplicationTx.submitted) {
+    return "Close";
+  }
+  if (state.wizardStep === wizardSteps.length - 1) {
+    return ownerWalletReady() ? "Create Draft On Testnet" : "Submit Application";
+  }
+  return "Continue";
 }
 
 function wizardPrimaryDisabled() {
   return (
     state.wizardStep === wizardSteps.length - 1 &&
     !isEvmAddress(state.testnetLaunchTx.launchAddress) &&
-    testnetLaunchValidation().length > 0
+    !state.launchApplicationTx.submitted &&
+    (ownerWalletReady() ? testnetLaunchValidation() : launchApplicationValidation()).length > 0
   );
 }
 
 function renderWizard() {
+  const creatorMode = ownerWalletReady();
   return `
     <div class="drawer ${state.wizardOpen ? "open" : ""}" aria-hidden="${state.wizardOpen ? "false" : "true"}">
       <div class="drawer-backdrop" data-action="close-wizard"></div>
       <section class="drawer-panel" role="dialog" aria-label="Create launch prototype">
         <div class="drawer-head">
           <div>
-            <h2>Create Launch</h2>
-            <p class="muted">Set your own raise and liquidity goals, then submit the lock, vesting, and incentive plan for review.</p>
+            <h2>${creatorMode ? "Create Launch" : "Apply to Launch"}</h2>
+            <p class="muted">${creatorMode ? "Set your own raise and liquidity goals, then submit the lock, vesting, and incentive plan for review." : "Share the token, raise, liquidity, vesting, and social details Arbor Foundry needs before creating the on-chain launch draft."}</p>
           </div>
           <button class="button icon-only" type="button" data-action="close-wizard" aria-label="Close drawer">${icons.close}</button>
         </div>
@@ -6330,12 +6432,11 @@ async function handleClick(event) {
       copyText(launchShareUrl(currentLaunch()), "Launch link copied.");
       break;
     case "open-wizard":
-      if (!creatorWalletReady()) {
-        showToast(state.connected ? "Connect the creator wallet for launch setup tools." : "Connect a creator wallet to create or manage a launch.");
-        break;
-      }
       state.wizardOpen = true;
       renderApp();
+      break;
+    case "submit-launch-application":
+      submitLaunchApplication();
       break;
     case "close-wizard":
       state.wizardOpen = false;
@@ -6348,8 +6449,13 @@ async function handleClick(event) {
       } else if (isEvmAddress(state.testnetLaunchTx.launchAddress)) {
         state.wizardOpen = false;
         renderApp();
-      } else {
+      } else if (state.launchApplicationTx.submitted) {
+        state.wizardOpen = false;
+        renderApp();
+      } else if (ownerWalletReady()) {
         await createTestnetLaunchDraft();
+      } else {
+        submitLaunchApplication();
       }
       break;
     case "prev-step":
@@ -6391,6 +6497,7 @@ async function handleTokenLogoChange(input) {
     state.wizardForm.tokenLogoSignature = signature;
     state.wizardForm.tokenLogoPendingSignature = "";
     state.wizardForm.tokenLogoError = "";
+    resetLaunchApplicationStatus();
     rememberWizardTokenLogo();
     renderApp();
     showToast("Token logo saved for this browser.");
@@ -6421,6 +6528,7 @@ async function handleInput(event) {
       return;
     }
     state.wizardForm[wizardField] = event.target.value;
+    resetLaunchApplicationStatus();
     if (wizardField === "saleToken" || wizardField === "symbol") rememberWizardTokenLogo();
     if (["saleToken", "saleTokenAmount", "saleType"].includes(wizardField)) {
       state.testnetLaunchTx = { status: "", hash: "", launchAddress: "", error: "" };
