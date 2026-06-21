@@ -698,6 +698,11 @@ const testnetProofRegistry = {
     contributionTx: "0x75e52ebfc907c512a4aec4c51019d072f7b9e768cbccced3462e986cdc96225e",
     finalizationTx: "0x0c7edd5a49912c414c708969233253dffd6b7028c9924ef044153ec465275472",
     claimTx: "0xda3d69347d820fbf160e87db0a85d3bd066fdbfa85baf50e6f6e78ee7880b40b",
+    lpFeeClaimTx: "0x4ca8bf3795cbdcc452485f7ae6f0414fd9e0f2d0c02d3aa46892405460b96c6d",
+    lpFeeToken0: "0x0dee41c818af69671a527f2c621ecdd386dea1cd",
+    lpFeeToken1: bnbTestnet.contracts.mockUsdt,
+    lpFeeAmount0: 0n,
+    lpFeeAmount1: 0n,
     claimWallet: bnbTestnet.expectedOwner,
     quoteSymbol: "USDT",
     totalRaised: 8000,
@@ -2024,7 +2029,7 @@ function lpFeeClaimDetail(launch, proof = testnetProofFor(launch)) {
   const token0 = lpFeeClaimTokenLabel(proof?.lpFeeToken0, launch, proof);
   const token1 = lpFeeClaimTokenLabel(proof?.lpFeeToken1, launch, proof);
 
-  if (amount0 === 0n && amount1 === 0n) {
+  if (BigInt(amount0 || 0) === 0n && BigInt(amount1 || 0) === 0n) {
     return "Claim checked successfully; no accrued LP fees were available yet.";
   }
   return `${proofQuantity(amount0, token0)} + ${proofQuantity(amount1, token1)} split 80/20.`;
@@ -4373,7 +4378,14 @@ function testnetProofFor(launch) {
   const fallback = testnetProofRegistry[normalizeAddress(vault)] || null;
   const indexed = launch?.testnet?.proofTrail || launch?.proofTrail || null;
   if (!indexed?.available && !indexed?.indexed) return fallback;
-  return { ...(fallback || {}), ...indexed };
+  const merged = { ...(fallback || {}), ...indexed };
+  if (fallback && indexed) {
+    Object.entries(fallback).forEach(([key, value]) => {
+      const indexedValue = indexed[key];
+      if (indexedValue === "" || indexedValue === null || indexedValue === undefined) merged[key] = value;
+    });
+  }
+  return merged;
 }
 
 function proofQuantity(amount, symbol, decimals = 18) {
