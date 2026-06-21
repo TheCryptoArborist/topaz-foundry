@@ -185,6 +185,20 @@ contract ArborFoundryMvpTest {
         _assertEq(SaleVault(context.launch).totalRaised(), 0);
     }
 
+    function testCancelAfterDepositIsRejectedToAvoidStuckFunds() external {
+        TestContext memory context = _createLaunchContext(500 ether, 1000 ether, 10_000 ether, 6000);
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 100 ether);
+        SaleVault(context.launch).deposit(100 ether);
+
+        (bool canceled,) = address(context.factory).call(abi.encodeCall(LaunchFactory.cancelLaunch, (context.launch)));
+        _assertFalse(canceled);
+        _assertEq(uint256(SaleVault(context.launch).status()), uint256(ArborFoundryTypes.LaunchStatus.Live));
+        _assertEq(SaleVault(context.launch).totalRaised(), 100 ether);
+    }
+
     function testQuoteTokenAllowlistBlocksUnapprovedQuoteAssets() external {
         TestContext memory context = _createLaunchContext(500 ether, 1000 ether, 10_000 ether, 6000);
         LaunchFactory factory = new LaunchFactory(address(this), context.platformTreasury);
@@ -275,6 +289,27 @@ contract ArborFoundryMvpTest {
         _assertFalse(finalizedAgain);
     }
 
+    function testFinalizerRejectsMismatchedLaunchTokens() external {
+        TestContext memory context = _createLaunchContext(1000 ether, 2000 ether, 10_000 ether, 6000);
+        TopazFinalizer finalizer = _attachFinalizer(context);
+
+        _fundAndOpen(context, 1, type(uint256).max);
+
+        context.quoteToken.approve(context.launch, 1000 ether);
+        SaleVault(context.launch).deposit(1000 ether);
+
+        MockERC20 wrongToken = new MockERC20("Wrong Token", "WRONG", 18);
+        wrongToken.mint(address(this), 5000 ether);
+        wrongToken.approve(address(finalizer), 5000 ether);
+
+        TopazFinalizer.FinalizeParams memory params = _finalizeParams(context, 5000 ether);
+        params.token = address(wrongToken);
+
+        (bool finalizedWithWrongToken,) = address(finalizer).call(abi.encodeCall(TopazFinalizer.finalizeLaunch, (params)));
+        _assertFalse(finalizedWithWrongToken);
+        _assertEq(uint256(SaleVault(context.launch).status()), uint256(ArborFoundryTypes.LaunchStatus.Live));
+    }
+
     function testLPLockerSplitsClaimedFeesEightyTwenty() external {
         MockERC20 token0 = new MockERC20("Fee Token 0", "FEE0", 18);
         MockERC20 token1 = new MockERC20("Fee Token 1", "FEE1", 18);
@@ -294,6 +329,33 @@ contract ArborFoundryMvpTest {
         _assertEq(token0.balanceOf(platform), 20 ether);
         _assertEq(token1.balanceOf(creator), 40 ether);
         _assertEq(token1.balanceOf(platform), 10 ether);
+    }
+
+    function testLPLockerRegistrationCannotBeOverwritten() external {
+        MockERC20 token0 = new MockERC20("Fee Token 0", "FEE0", 18);
+        MockERC20 token1 = new MockERC20("Fee Token 1", "FEE1", 18);
+        MockTopazPair pair = new MockTopazPair(address(token0), address(token1));
+        FeeSplitLPLocker locker = new FeeSplitLPLocker(address(this));
+
+        address creator = address(0xCAFE);
+        address platform = address(0xFEE);
+
+        locker.registerLock(address(pair), creator, platform, type(uint256).max, true);
+
+        (bool overwritten,) = address(locker).call(
+            abi.encodeCall(
+                FeeSplitLPLocker.registerLock,
+                (address(pair), address(0xBEEF), address(0xD00D), block.timestamp + 365 days, false)
+            )
+        );
+        _assertFalse(overwritten);
+
+        (address creatorBeneficiary, address platformBeneficiary,, bool permanent, bool exists) =
+            locker.locks(address(pair));
+        _assertEq(creatorBeneficiary, creator);
+        _assertEq(platformBeneficiary, platform);
+        _assertTrue(permanent);
+        _assertTrue(exists);
     }
 
     function testIncentiveEscrowBlocksOverFundingAndReleasesFundedAmount() external {

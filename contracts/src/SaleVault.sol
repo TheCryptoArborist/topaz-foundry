@@ -111,7 +111,16 @@ contract SaleVault is ArborReentrancyGuard {
 
     function cancel() external onlyFactory {
         if (status == ArborFoundryTypes.LaunchStatus.Finalized) revert InvalidStatus();
+        if (totalRaised != 0) revert InvalidStatus();
         _setStatus(ArborFoundryTypes.LaunchStatus.Cancelled);
+    }
+
+    function saleToken() external view returns (address) {
+        return config.saleToken;
+    }
+
+    function quoteToken() external view returns (address) {
+        return config.quoteToken;
     }
 
     function fundSaleTokens(uint256 amount) external nonReentrant {

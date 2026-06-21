@@ -58,6 +58,9 @@ contract TopazFinalizer is ArborOwnable, ArborReentrancyGuard {
             params.launch == address(0) || params.token == address(0) || params.quoteToken == address(0)
                 || params.lpReceiver == address(0) || params.creatorProceedsReceiver == address(0)
         ) revert InvalidConfig();
+        if (SaleVault(params.launch).saleToken() != params.token || SaleVault(params.launch).quoteToken() != params.quoteToken) {
+            revert InvalidConfig();
+        }
 
         accounting = SaleVault(params.launch).releaseQuoteForFinalization(address(this), params.creatorProceedsReceiver);
 

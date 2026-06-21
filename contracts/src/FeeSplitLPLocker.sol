@@ -52,6 +52,7 @@ contract FeeSplitLPLocker is ArborOwnable, ArborReentrancyGuard {
             revert InvalidConfig();
         }
         if (!permanent && unlockTime <= block.timestamp) revert InvalidConfig();
+        if (locks[lpToken].exists) revert InvalidConfig();
 
         locks[lpToken] = LockInfo({
             creatorBeneficiary: creatorBeneficiary,
