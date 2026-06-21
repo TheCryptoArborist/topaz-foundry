@@ -2478,6 +2478,21 @@ function resumeTestnetLaunch(launchAddress) {
   showToast(finalizable ? "Finalization panel loaded. Approve LP tokens next." : refundable ? "Refund panel loaded." : `Loaded ${shortAddress(launch.address)}.`);
 }
 
+function openTestnetFinalizationControls() {
+  const finalizable = managedTestnetLaunches().find(testnetLaunchFinalizable);
+  if (finalizable) {
+    resumeTestnetLaunch(finalizable.address);
+    return;
+  }
+
+  state.view = "testnet";
+  renderApp();
+  window.setTimeout(() => {
+    document.getElementById("latest-sale-vaults")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 0);
+  showToast("No managed launch is ready to finalize yet. Pick a live SaleVault after soft cap is met.");
+}
+
 async function readProofTrailForSaleVault(address, config, accounting, latestBlock, fromBlock) {
   const proof = {
     available: false,
@@ -4748,7 +4763,7 @@ function renderTestnetView() {
           </div>
         </section>
       </div>
-      <section class="panel pad">
+      <section class="panel pad" id="latest-sale-vaults">
         <div class="panel-title">
           <h3>Latest Sale Vaults</h3>
           <span class="micro">Newest SaleVaults from LaunchFactory; token-only deploys appear after Draft creation</span>
@@ -5047,7 +5062,7 @@ function renderFinalizeView() {
       ${renderPageHeader(
         "Finalize Launch",
         "The operational path after a project meets soft cap and the sale closes.",
-        '<button class="button primary" type="button" data-action="show-toast">' + icons.check + " Simulate finalization</button>",
+        '<button class="button primary" type="button" data-action="open-testnet-finalization">' + icons.check + " Open Testnet Controls</button>",
       )}
       ${renderKpiGrid([
         ["Actual final raise", money(preview.finalRaise), `${preview.launch.name} example`],
@@ -6464,6 +6479,9 @@ async function handleClick(event) {
       break;
     case "show-toast":
       showToast("Prototype action captured. This would open the linked detail flow.");
+      break;
+    case "open-testnet-finalization":
+      openTestnetFinalizationControls();
       break;
     default:
       break;
