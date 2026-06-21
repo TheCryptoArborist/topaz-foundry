@@ -481,6 +481,11 @@ const state = {
     checks: [],
     launches: [],
   },
+  proofIndexLoading: false,
+  proofIndexError: "",
+  proofIndexLastUpdated: "",
+  proofIndexBlock: null,
+  proofRecords: {},
   contribution: "",
   wizardOpen: false,
   wizardStep: 0,
@@ -2640,6 +2645,50 @@ async function readLaunchFactory() {
   };
 }
 
+async function readProofRecordIndex() {
+  const response = await fetch("/api/testnet-proof-records", {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Proof indexer returned ${response.status}.`);
+  const payload = await response.json();
+  if (!payload?.ok) throw new Error(payload?.error || "Proof indexer could not read BNB testnet records.");
+  return payload;
+}
+
+function applyProofRecordIndex(payload) {
+  const records = payload?.records && typeof payload.records === "object" ? payload.records : {};
+  state.proofRecords = Object.fromEntries(
+    Object.entries(records)
+      .filter(([, record]) => isEvmAddress(record?.saleVault))
+      .map(([, record]) => [
+        normalizeAddress(record.saleVault),
+        {
+          ...record,
+          available: true,
+          indexed: true,
+          source: record.source || "Arbor Foundry proof indexer",
+        },
+      ]),
+  );
+  state.proofIndexBlock = payload?.latestBlock || null;
+  state.proofIndexLastUpdated = payload?.generatedAt
+    ? new Date(payload.generatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  state.proofIndexError = "";
+}
+
+async function readProofRecordIndexSafe() {
+  try {
+    return { payload: await readProofRecordIndex(), error: "" };
+  } catch (error) {
+    return {
+      payload: null,
+      error: error.message || "Proof indexer is not reachable. Browser contract reads are still active.",
+    };
+  }
+}
+
 async function readSaleVault(address, index, latestBlock = 0n, createdBlock = null) {
   const status = Number(decodeUint256(await ethCall(address, contractSelectors.status)));
   const totalRaised = decodeUint256(await ethCall(address, contractSelectors.totalRaised));
@@ -2703,18 +2752,26 @@ async function readSaleVault(address, index, latestBlock = 0n, createdBlock = nu
 
 async function refreshTestnetData(silent = false) {
   state.testnetLoading = true;
+  state.proofIndexLoading = true;
   state.testnetError = "";
+  state.proofIndexError = "";
   if (!silent) renderApp();
 
   try {
-    const data = await readLaunchFactory();
+    const [data, proofIndex] = await Promise.all([readLaunchFactory(), readProofRecordIndexSafe()]);
     state.testnetData = data;
+    if (proofIndex.payload) {
+      applyProofRecordIndex(proofIndex.payload);
+    } else {
+      state.proofIndexError = proofIndex.error;
+    }
     state.testnetLastUpdated = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     if (state.view === "launchpad") ensureSelectedLaunchVisible(true);
   } catch (error) {
     state.testnetError = error.message || "Could not read BNB testnet contracts.";
   } finally {
     state.testnetLoading = false;
+    state.proofIndexLoading = false;
     renderApp();
   }
 }
@@ -4375,17 +4432,28 @@ function openTopazTrade() {
 
 function testnetProofFor(launch) {
   const vault = launch?.testnet?.vault || launch?.address || "";
+  const indexedRecord = state.proofRecords[normalizeAddress(vault)] || null;
   const fallback = testnetProofRegistry[normalizeAddress(vault)] || null;
   const indexed = launch?.testnet?.proofTrail || launch?.proofTrail || null;
-  if (!indexed?.available && !indexed?.indexed) return fallback;
-  const merged = { ...(fallback || {}), ...indexed };
-  if (fallback && indexed) {
-    Object.entries(fallback).forEach(([key, value]) => {
-      const indexedValue = indexed[key];
-      if (indexedValue === "" || indexedValue === null || indexedValue === undefined) merged[key] = value;
+  return mergeProofSources(fallback, indexedRecord, indexed);
+}
+
+function hasProofValue(value) {
+  return value !== "" && value !== null && value !== undefined;
+}
+
+function mergeProofSources(...sources) {
+  const merged = {};
+  const logErrors = [];
+  sources.filter(Boolean).forEach((source) => {
+    if (Array.isArray(source.logErrors)) logErrors.push(...source.logErrors.filter(Boolean));
+    Object.entries(source).forEach(([key, value]) => {
+      if (key === "logErrors") return;
+      if (hasProofValue(value)) merged[key] = value;
     });
-  }
-  return merged;
+  });
+  if (logErrors.length) merged.logErrors = [...new Set(logErrors)];
+  return Object.keys(merged).length ? merged : null;
 }
 
 function proofQuantity(amount, symbol, decimals = 18) {
@@ -4420,7 +4488,9 @@ function renderFinalizedProofTrail(launch) {
       ? "Ready to claim"
       : "Claim path open";
   const evidenceLabel = "Verified proof";
-  const proofSource = proof.indexed
+  const proofSource = proof.source
+    ? `${escapeHtml(proof.source)}.`
+    : proof.indexed
     ? "Indexed from BNB testnet event logs."
     : "Linked to saved BNB testnet transactions and contracts.";
   const claimDetail = proof.claimTx
@@ -5310,6 +5380,42 @@ function renderAdminLpFeeClaimPanel() {
   `;
 }
 
+function renderProofIndexerPanel() {
+  if (!adminWalletReady()) return "";
+
+  const recordCount = Object.keys(state.proofRecords || {}).length;
+  const status = state.proofIndexLoading
+    ? "Refreshing"
+    : state.proofIndexError
+      ? "Fallback active"
+      : recordCount
+        ? "Live"
+        : "Waiting";
+  const rows = [
+    ["Indexer status", status, "Server-side BNB testnet proof reader"],
+    ["Proof records", recordCount.toLocaleString(), "Recent SaleVault records merged into verification pages"],
+    ["Latest indexed block", state.proofIndexBlock ? Number(state.proofIndexBlock).toLocaleString() : "Not loaded", "Used to confirm the proof-read window"],
+    ["Last refresh", state.proofIndexLastUpdated || "Not loaded", "Updates when testnet reads refresh"],
+  ];
+
+  return `
+    <section class="panel pad">
+      <div class="panel-title">
+        <h3>Proof Indexer</h3>
+        <span class="micro">${state.proofIndexError ? "Browser fallback" : "Server read"}</span>
+      </div>
+      <div class="assist-note">
+        <strong>What this adds</strong>
+        <span>Arbor Foundry now asks a Netlify API to read recent BNB testnet SaleVault proof records, then merges those records into the public verification pages.</span>
+      </div>
+      ${renderDataTable(["Check", "Value", "Meaning"], rows)}
+      <div class="success-note ${state.proofIndexError ? "show warn" : recordCount ? "show" : ""}">
+        ${escapeHtml(state.proofIndexError || (recordCount ? "Proof indexer is returning records." : ""))}
+      </div>
+    </section>
+  `;
+}
+
 function renderAdminView() {
   return `
     <div class="page-stack">
@@ -5327,6 +5433,7 @@ function renderAdminView() {
         </div>
         ${renderDataTable(["Metric", "Value", "Meaning"], adminAccountingRows())}
       </section>
+      ${renderProofIndexerPanel()}
       ${renderAdminLpFeeClaimPanel()}
       <div class="split-layout wide-left">
         <section class="panel pad">
