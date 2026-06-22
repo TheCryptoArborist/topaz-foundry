@@ -2469,6 +2469,7 @@ function resumeTestnetLaunch(launchAddress) {
   };
   state.finalizationTx = { status: "", hash: "", pair: "", error: "" };
   state.wizardStep = wizardSteps.length - 1;
+  state.view = "testnet";
   renderApp();
   window.setTimeout(() => {
     document
