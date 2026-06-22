@@ -4226,7 +4226,7 @@ function renderContribute(launch) {
   const remainingMax = limits.remaining;
   const priorContribution = limits.previous;
   const contributionClosed = state.connected && limits.contributionClosed;
-  const closedButtonLabel = limits.walletMaxReached ? "Wallet Max Reached" : "Sale Capacity Reached";
+  const closedButtonLabel = limits.walletMaxReached ? "Wallet Limit Reached" : "Sale Capacity Reached";
   const contributionLimitNote = contributionLimitMessage(launch);
   const minLabel = priorContribution > 0 ? "Top-up minimum" : "First minimum";
   const minValue = priorContribution > 0 ? `Any amount` : `${launch.min.toLocaleString()} ${asset}`;
