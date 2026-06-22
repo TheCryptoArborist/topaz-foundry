@@ -1836,9 +1836,34 @@ async function finalizeTestnetLaunch() {
   }
 }
 
+function contributionLimitState(launch) {
+  const previous = Number(launch?.yourContribution || 0);
+  const remaining = Number(launch?.remainingMax ?? launch?.max ?? 0);
+  const max = Number(launch?.max || 0);
+  return {
+    previous,
+    remaining,
+    max,
+    contributionClosed: remaining <= 0,
+    walletMaxReached: previous > 0 && remaining <= 0,
+  };
+}
+
+function contributionLimitMessage(launch) {
+  const limits = contributionLimitState(launch);
+  const asset = quoteAsset(launch);
+  if (limits.walletMaxReached) return `This wallet has reached the ${limits.max.toLocaleString()} ${asset} maximum.`;
+  if (limits.contributionClosed) return "This launch has no remaining contribution room.";
+  return "";
+}
+
 function contributionValidation(launch) {
   if (launch.status !== "live") return { ok: false, message: "This launch is not accepting deposits." };
   if (!launch.testnet?.vault) return { ok: false, message: "This demo launch is still preview-only." };
+  const limits = contributionLimitState(launch);
+  const previous = limits.previous;
+  const remaining = limits.remaining;
+  if (remaining <= 0) return { ok: false, message: contributionLimitMessage(launch) };
   if (!state.contribution) return { ok: false, message: "Enter a contribution amount." };
 
   let amount = 0;
@@ -1850,10 +1875,7 @@ function contributionValidation(launch) {
   }
 
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: "Enter a contribution amount above 0." };
-  const previous = Number(launch.yourContribution || 0);
-  const remaining = Number(launch.remainingMax ?? launch.max);
   if (previous <= 0 && amount < launch.min) return { ok: false, message: `First contribution minimum is ${launch.min.toLocaleString()} ${quoteAsset(launch)}.` };
-  if (remaining <= 0) return { ok: false, message: `This wallet has reached the ${launch.max.toLocaleString()} ${quoteAsset(launch)} maximum.` };
   if (amount > remaining) {
     return {
       ok: false,
@@ -4200,8 +4222,12 @@ function renderContribute(launch) {
   const action = primaryActionFor(launch);
   const disabled = launch.status !== "live";
   const asset = quoteAsset(launch);
-  const remainingMax = Number(launch.remainingMax ?? launch.max);
-  const priorContribution = Number(launch.yourContribution || 0);
+  const limits = contributionLimitState(launch);
+  const remainingMax = limits.remaining;
+  const priorContribution = limits.previous;
+  const contributionClosed = state.connected && limits.contributionClosed;
+  const closedButtonLabel = limits.walletMaxReached ? "Wallet Max Reached" : "Sale Capacity Reached";
+  const contributionLimitNote = contributionLimitMessage(launch);
   const minLabel = priorContribution > 0 ? "Top-up minimum" : "First minimum";
   const minValue = priorContribution > 0 ? `Any amount` : `${launch.min.toLocaleString()} ${asset}`;
   const maxLabel = priorContribution > 0 ? "Remaining max" : "Maximum";
@@ -4239,14 +4265,14 @@ function renderContribute(launch) {
       <div class="input-wrap">
         <div class="field-label"><span>You pay</span><span>Balance: ${state.connected ? `84,120 ${asset}` : "--"}</span></div>
         <div class="amount-input">
-          <input data-input="contribution" type="number" min="${priorContribution > 0 ? 0 : launch.min}" max="${remainingMax}" step="1" value="${state.contribution}" placeholder="0.0" />
+          <input data-input="contribution" type="number" min="${priorContribution > 0 ? 0 : launch.min}" max="${remainingMax}" step="1" value="${state.contribution}" placeholder="0.0" ${contributionClosed ? "disabled" : ""} />
           <select class="asset-select" aria-label="Pay asset">
             <option>${asset}</option>
           </select>
         </div>
         <div class="quick-grid">
           ${[25, 50, 75, 100]
-            .map((value) => `<button type="button" data-quick="${value}">${value === 100 ? "MAX" : `${value}%`}</button>`)
+            .map((value) => `<button type="button" data-quick="${value}" ${contributionClosed ? "disabled" : ""}>${value === 100 ? "MAX" : `${value}%`}</button>`)
             .join("")}
         </div>
         <div class="swap-control" aria-hidden="true">${icons.swap}</div>
@@ -4257,7 +4283,7 @@ function renderContribute(launch) {
             <option>${launch.symbol}</option>
           </select>
         </div>
-        <button class="button primary" type="button" data-action="${action.action}">${action.button}</button>
+        <button class="button primary" type="button" data-action="${action.action}" ${contributionClosed ? "disabled" : ""}>${contributionClosed ? closedButtonLabel : action.button}</button>
       </div>
       <div class="limits">
         <div class="metric"><span>${minLabel}</span><strong>${minValue}</strong></div>
@@ -4268,7 +4294,7 @@ function renderContribute(launch) {
         <strong>Before you contribute</strong>
         <span>Confirm the soft cap, refund rule, vesting, and risk flags on this page.</span>
       </div>
-      ${renderContributionNote(launch)}
+      ${contributionClosed ? `<div class="success-note show warn">${escapeHtml(contributionLimitNote)}</div>` : renderContributionNote(launch)}
       <div class="success-note ${state.contributionTx.status || state.contributionTx.error ? "show" : ""} ${state.contributionTx.error ? "warn" : ""}">
         ${escapeHtml(state.contributionTx.error || state.contributionTx.status)}
         ${state.contributionTx.hash ? `<br><a href="${explorerTxLink(state.contributionTx.hash)}" target="_blank" rel="noreferrer">View transaction</a>` : ""}
@@ -4491,11 +4517,25 @@ function nextStepForLaunchpad() {
   if (status === "live") {
     if ((creatorWalletReady() || adminWalletReady()) && isSoftCapMet(launch)) {
       return {
-        kicker: "Creator next",
+        kicker: adminWalletReady() ? "Admin next" : "Creator next",
         title: "Soft cap is met. Finalize when deposits are done.",
         body: "Open the testnet controls to approve LP tokens and run finalization from the selected SaleVault.",
         buttons: [
           { label: "Open Finalization Controls", action: "open-testnet-finalization", icon: icons.check },
+          { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+        ],
+      };
+    }
+    const limits = contributionLimitState(launch);
+    if (state.connected && limits.contributionClosed) {
+      return {
+        kicker: "Buyer next",
+        title: limits.walletMaxReached ? "You reached your wallet max for this launch." : "This launch cannot accept more from this wallet.",
+        body: limits.walletMaxReached
+          ? "No more deposits are available from this wallet. Watch progress, review proof, or check My Contributions while the creator prepares finalization."
+          : "Contribution room is closed for this wallet. Watch progress or review the verification page.",
+        buttons: [
+          { label: "View My Contributions", view: "portfolio", icon: icons.stack },
           { label: "View Verification", action: "view-current-proof", className: "button ghost" },
         ],
       };
@@ -6706,7 +6746,14 @@ async function handleClick(event) {
   if (quick) {
     const launch = currentLaunch();
     const balance = 84120;
-    const max = Number(launch.remainingMax ?? launch.max);
+    const limits = contributionLimitState(launch);
+    const max = limits.remaining;
+    if (max <= 0) {
+      state.contribution = "";
+      state.contributionTx = { status: contributionLimitMessage(launch), hash: "", error: contributionLimitMessage(launch) };
+      renderApp();
+      return;
+    }
     state.contribution = Math.min(max, Math.round((balance * Number(quick)) / 100)).toString();
     state.contributionTx = { status: "", hash: "", error: "" };
     renderApp();
