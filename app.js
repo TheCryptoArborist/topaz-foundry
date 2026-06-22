@@ -4416,6 +4416,330 @@ function renderPageHeader(title, description, action = "") {
   `;
 }
 
+function renderNextStepButton(button, index) {
+  if (!button) return "";
+  const attrs = [];
+  if (button.action) attrs.push(`data-action="${escapeHtml(button.action)}"`);
+  if (button.view) attrs.push(`data-view="${escapeHtml(button.view)}"`);
+  if (button.launchAddress) attrs.push(`data-launch-address="${escapeHtml(button.launchAddress)}"`);
+  if (button.toast) attrs.push(`data-toast="${escapeHtml(button.toast)}"`);
+  const className = button.className || (index === 0 ? "button primary" : "button ghost");
+  const icon = button.icon ? `${button.icon} ` : "";
+  return `<button class="${escapeHtml(className)}" type="button" ${attrs.join(" ")}>${icon}${escapeHtml(button.label)}</button>`;
+}
+
+function renderNextStepCard(card) {
+  if (!card) return "";
+  const buttons = (card.buttons || []).map(renderNextStepButton).join("");
+  const note = card.note ? `<span class="next-step-note">${escapeHtml(card.note)}</span>` : "";
+  return `
+    <section class="next-step-card ${escapeHtml(card.tone || "")}">
+      <div class="next-step-copy">
+        <span class="next-step-kicker">${escapeHtml(card.kicker || "Next step")}</span>
+        <h3>${escapeHtml(card.title)}</h3>
+        <p>${escapeHtml(card.body)}</p>
+        ${note}
+      </div>
+      ${buttons ? `<div class="next-step-actions">${buttons}</div>` : ""}
+    </section>
+  `;
+}
+
+function setupActionForKey(key) {
+  const labels = {
+    approve: "Approve Sale Tokens",
+    fund: "Fund Vault",
+    approveLaunch: "Approve Launch",
+    open: "Open Launch",
+  };
+  const actions = {
+    approve: "approve-sale-token",
+    fund: "fund-sale-tokens",
+    approveLaunch: "approve-testnet-launch",
+    open: "open-testnet-launch",
+  };
+  if (!key || !labels[key]) return null;
+  return {
+    label: labels[key],
+    action: actions[key],
+    icon: icons.check,
+  };
+}
+
+function launchStatusTabFor(launch) {
+  if (!launch) return state.tab;
+  return statusKeyFromLabel(launch.statusLabel || launch.status || state.tab);
+}
+
+function nextStepForLaunchpad() {
+  const launch = currentLaunch();
+  if (!launch) return null;
+  const status = launch.status;
+
+  if (!state.connected) {
+    return {
+      kicker: "Start here",
+      title: "Connect a wallet, or inspect the verification page first.",
+      body: "Connecting unlocks contributions, refunds, claims, and creator tools when the wallet has permission.",
+      buttons: [
+        { label: "Connect Wallet", action: "connect-wallet", icon: icons.wallet },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+
+  if (status === "live") {
+    if ((creatorWalletReady() || adminWalletReady()) && isSoftCapMet(launch)) {
+      return {
+        kicker: "Creator next",
+        title: "Soft cap is met. Finalize when deposits are done.",
+        body: "Open the testnet controls to approve LP tokens and run finalization from the selected SaleVault.",
+        buttons: [
+          { label: "Open Finalization Controls", action: "open-testnet-finalization", icon: icons.check },
+          { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+        ],
+      };
+    }
+    return {
+      kicker: "Buyer next",
+      title: isSoftCapMet(launch) ? "Soft cap is met. You can still contribute until close." : "Review the terms, then contribute from the right panel.",
+      body: `${nextMilestoneFor(launch)}. The contribution box is the panel on the right side of this page.`,
+      buttons: [
+        { label: "Go to Contribution Box", action: "focus-contribution", icon: icons.launch },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+
+  if (status === "finalized") {
+    const action = primaryActionFor(launch);
+    return {
+      kicker: "Buyer next",
+      title: action.button === "Claim Tokens" ? "Claim your tokens, then verify the proof." : "Claims and proof are live.",
+      body: "The verification page shows the final raise, Topaz pair, LP lock, fee split, and claim status.",
+      buttons: [
+        { label: action.button, action: action.action, icon: icons.check },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+
+  if (status === "refunding") {
+    const action = primaryActionFor(launch);
+    return {
+      kicker: "Buyer next",
+      title: action.button === "Claim Refund" ? "Claim your refund from the right panel." : "Refund proof is available.",
+      body: "The sale missed soft cap, so deposits return from the SaleVault and no platform success fee is taken.",
+      buttons: [
+        { label: action.button, action: action.action, icon: icons.wallet },
+        { label: "View Refund Proof", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+
+  if (status === "approved" || status === "upcoming") {
+    return {
+      kicker: "Launch status",
+      title: status === "approved" ? "Approved, but deposits are not open yet." : "Scheduled and waiting for the sale window.",
+      body: "Watch this launch or open verification to confirm what is ready before deposits begin.",
+      buttons: [
+        { label: "Watch Launch", action: "show-toast", toast: "This launch is not accepting deposits yet.", icon: icons.launch },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+
+  return {
+    kicker: "Creator next",
+    title: "Finish review before this launch can accept deposits.",
+    body: "Draft and pending launches need review approval before buyers can participate.",
+    buttons: [
+      { label: "Open Project Review", view: "projects", icon: icons.doc },
+      { label: "Open Testnet Controls", view: "testnet", className: "button ghost" },
+    ],
+  };
+}
+
+function nextStepForProof() {
+  const launch = currentLaunch();
+  if (!launch) return null;
+  if (launch.status === "finalized") {
+    const action = primaryActionFor(launch);
+    return {
+      kicker: "From proof",
+      title: action.button === "Claim Tokens" ? "Go claim tokens from the launch page." : "Proof is complete. The launch page has the claim state.",
+      body: "Use the launch page when you need buyer actions; use this page when you need receipts and verification.",
+      buttons: [
+        { label: "Go to Claim Panel", action: "view-current-launch", icon: icons.check },
+        { label: "View Testnet Pair", action: "open-topaz-trade", className: "button ghost", icon: icons.swap },
+      ],
+    };
+  }
+  if (launch.status === "refunding") {
+    return {
+      kicker: "From proof",
+      title: "Go claim refunds from the launch page.",
+      body: "This proof page explains why refunds are open. The refund button lives on the launch detail page.",
+      buttons: [
+        { label: "Go to Refund Panel", action: "view-current-launch", icon: icons.wallet },
+        { label: "Copy Verification Link", action: "copy-link", className: "button ghost" },
+      ],
+    };
+  }
+  if (launch.status === "live") {
+    return {
+      kicker: "From proof",
+      title: "Go to the live launch to contribute or monitor soft cap.",
+      body: "Verification explains the launch; the Launchpad page is where deposits and live progress happen.",
+      buttons: [
+        { label: "Go to Live Launch", action: "view-current-launch", icon: icons.launch },
+        { label: "Copy Verification Link", action: "copy-link", className: "button ghost" },
+      ],
+    };
+  }
+  return {
+    kicker: "From proof",
+    title: "Return to Launchpad to follow this launch.",
+    body: "The launch page shows status, buyer actions, and the next milestone.",
+    buttons: [
+      { label: "Go to Launchpad", action: "view-current-launch", icon: icons.launch },
+      { label: "Copy Verification Link", action: "copy-link", className: "button ghost" },
+    ],
+  };
+}
+
+function nextStepForTestnet() {
+  const launch = selectedTestnetLaunch();
+  if (!creatorWalletReady() && !adminWalletReady()) {
+    return {
+      kicker: "Creator tools",
+      title: "Connect the creator wallet to manage testnet launches.",
+      body: "Buyer wallets can inspect launches, but creator setup buttons stay hidden until the correct wallet is connected.",
+      buttons: [{ label: "Connect Wallet", action: "connect-wallet", icon: icons.wallet }],
+    };
+  }
+  if (!launch) {
+    return {
+      kicker: "Choose a launch",
+      title: "Select a SaleVault from Latest Sale Vaults, or create a new one.",
+      body: "Use Continue setup for existing drafts, or Create Launch when you want a fresh testnet run.",
+      buttons: [
+        { label: "Create Launch", action: "open-wizard", icon: icons.plus },
+        { label: "Refresh Testnet Reads", action: "refresh-testnet", className: "button ghost" },
+      ],
+    };
+  }
+  const setupKey = testnetSetupNextActionKey(launch);
+  const setupButton = setupActionForKey(setupKey);
+  if (setupButton) {
+    return {
+      kicker: "Selected SaleVault",
+      title: `Next: ${setupButton.label}.`,
+      body: "The numbered setup checklist below shows the same order. Run one button at a time and confirm each wallet transaction.",
+      buttons: [
+        setupButton,
+        { label: "View Live Launch", action: "view-testnet-launch", launchAddress: launch.address, className: "button ghost" },
+      ],
+    };
+  }
+  if (launch.statusLabel === "Live" && testnetSoftCapMet(launch)) {
+    return {
+      kicker: "Selected SaleVault",
+      title: "Soft cap is met. Finalize when deposits are done.",
+      body: "Open the finalization panel, approve LP tokens, then finalize this launch.",
+      buttons: [
+        { label: "Open Finalization Panel", action: "open-testnet-finalization", icon: icons.check },
+        { label: "View Live Launch", action: "view-testnet-launch", launchAddress: launch.address, className: "button ghost" },
+      ],
+    };
+  }
+  if (launch.statusLabel === "Live" && testnetLaunchRefundable(launch)) {
+    return {
+      kicker: "Selected SaleVault",
+      title: "This launch is below soft cap. Enable refunds only when deposits are done.",
+      body: "Refunding closes the failed sale path and lets buyers claim their quote asset back.",
+      buttons: [
+        { label: "Enable Refunds", action: "enable-testnet-refunds", icon: icons.wallet },
+        { label: "View Live Launch", action: "view-testnet-launch", launchAddress: launch.address, className: "button ghost" },
+      ],
+    };
+  }
+  if (launch.statusLabel === "Finalized") {
+    return {
+      kicker: "Selected SaleVault",
+      title: "Finalized. Send users to claims and verification.",
+      body: "The public launch page handles buyer claims. The verification page is the permanent receipt.",
+      buttons: [
+        { label: "View Claims", action: "view-testnet-launch", launchAddress: launch.address, icon: icons.check },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+  if (launch.statusLabel === "Refunding") {
+    return {
+      kicker: "Selected SaleVault",
+      title: "Refunds are open. Send users to the refund panel.",
+      body: "The public launch page shows the refund button and the verification page explains the failed launch result.",
+      buttons: [
+        { label: "View Refunds", action: "view-testnet-launch", launchAddress: launch.address, icon: icons.wallet },
+        { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+      ],
+    };
+  }
+  return {
+    kicker: "Selected SaleVault",
+    title: "Monitor this launch from Launchpad.",
+    body: "The public page shows progress, buyer actions, and the current milestone.",
+    buttons: [{ label: "View Launch", action: "view-testnet-launch", launchAddress: launch.address, icon: icons.launch }],
+  };
+}
+
+function nextStepForFinalize() {
+  return {
+    kicker: "Finalization path",
+    title: "Use Testnet Controls for real SaleVault finalization.",
+    body: "This page explains the math. The real testnet buttons live in the Testnet section after selecting a soft-cap-met SaleVault.",
+    buttons: [
+      { label: "Open Testnet Controls", action: "open-testnet-finalization", icon: icons.check },
+      { label: "View Verification", action: "view-current-proof", className: "button ghost" },
+    ],
+  };
+}
+
+function nextStepForProjects() {
+  return {
+    kicker: "Reviewer next",
+    title: "Review blocks low-quality launches before deposits open.",
+    body: "Use this page to check disclosures, risk labels, source details, liquidity terms, and whether a launch is safe to publish.",
+    buttons: [
+      { label: "Start New Application", action: "open-wizard", icon: icons.plus },
+      { label: "Open Admin Dashboard", view: "admin", className: "button ghost" },
+    ],
+  };
+}
+
+function nextStepForAdmin() {
+  return {
+    kicker: "Admin next",
+    title: "Watch the operational queues first.",
+    body: "Approval, finalization, refund, proof indexing, and LP fee actions should be handled from this dashboard and the Testnet controls.",
+    buttons: [
+      { label: "Open Testnet Controls", view: "testnet", icon: icons.check },
+      { label: "Open Project Review", view: "projects", className: "button ghost" },
+    ],
+  };
+}
+
+function renderViewNextStep(view = state.view) {
+  if (view === "launchpad") return renderNextStepCard(nextStepForLaunchpad());
+  if (view === "proof") return renderNextStepCard(nextStepForProof());
+  if (view === "testnet") return renderNextStepCard(nextStepForTestnet());
+  if (view === "finalize") return renderNextStepCard(nextStepForFinalize());
+  if (view === "projects") return renderNextStepCard(nextStepForProjects());
+  if (view === "admin") return renderNextStepCard(nextStepForAdmin());
+  return "";
+}
+
 function renderKpiGrid(items) {
   return `
     <div class="kpi-grid">
@@ -4731,6 +5055,7 @@ function renderTestnetView() {
         "Read-only wallet and contract status for the deployed Arbor Foundry rehearsal stack.",
         renderTestnetActions(),
       )}
+      ${renderViewNextStep("testnet")}
       ${renderKpiGrid([
         ["Wallet", state.connected ? shortAddress(state.walletAddress) : "Not connected", state.walletStatus],
         ["Network", testnetNetworkLabel(), state.connected ? `Wallet chain ${chainIdLabel(state.walletChainId)}` : "Public read fallback"],
@@ -4785,6 +5110,7 @@ function renderLaunchpadView() {
           "Review approval, sale terms, soft-cap safety, LP lock proof, vesting, and incentives before participating.",
           renderTabs(),
         )}
+        ${renderViewNextStep("launchpad")}
         <div class="grid">
           ${renderLaunchList()}
           ${renderDetail()}
@@ -4885,6 +5211,7 @@ function renderProofCenterView() {
         "Check the sale result, liquidity status, LP lock, vesting, claims/refunds, and Topaz pair before you trust or act on this launch.",
         tradeAction,
       )}
+      ${renderViewNextStep("proof")}
       <div class="proof-page-grid">
         <section class="panel hero-panel" style="--logo-color:${launch.color}">
           <div class="hero-top">
@@ -5065,6 +5392,7 @@ function renderFinalizeView() {
         "The operational path after a project meets soft cap and the sale closes.",
         '<button class="button primary" type="button" data-action="open-testnet-finalization">' + icons.check + " Open Testnet Controls</button>",
       )}
+      ${renderViewNextStep("finalize")}
       ${renderKpiGrid([
         ["Actual final raise", money(preview.finalRaise), `${preview.launch.name} example`],
         ["Soft cap", money(preview.softCap), "Minimum to launch"],
@@ -5321,6 +5649,7 @@ function renderProjectsView() {
         "Application review, disclosure checks, and launch readiness before a project appears publicly.",
         '<button class="button primary" type="button" data-action="open-wizard">' + icons.plus + " New application</button>",
       )}
+      ${renderViewNextStep("projects")}
       ${renderKpiGrid([
         ["Applications", "3", "In review"],
         ["Ready to publish", "1", "Needs final approval"],
@@ -5495,6 +5824,7 @@ function renderAdminView() {
   return `
     <div class="page-stack">
       ${renderPageHeader("Admin Dashboard", "Operational controls for launch readiness, finalization, refunds, and verification publication.")}
+      ${renderViewNextStep("admin")}
       ${renderKpiGrid([
         ["Approval queue", "3", "Draft and pending review items"],
         ["Finalization tasks", "2", "Live launches above soft cap"],
@@ -5918,6 +6248,10 @@ function renderTestnetFinalizationPanel(launch) {
           Finalized launches should now publish proof, LP lock status, and buyer claim instructions.
           ${state.finalizationTx.hash ? `<br><a href="${explorerTxLink(state.finalizationTx.hash)}" target="_blank" rel="noreferrer">View finalization transaction</a>` : ""}
         </div>
+        <div class="drawer-actions">
+          <button class="button primary" type="button" data-action="view-testnet-launch" data-launch-address="${escapeHtml(launch.address)}">${icons.check} View Buyer Claim Panel</button>
+          <button class="button ghost" type="button" data-action="view-current-proof" data-launch-address="${escapeHtml(launch.address)}">${icons.doc} View Verification</button>
+        </div>
       </div>
     `;
   }
@@ -6281,6 +6615,60 @@ function copyText(text, successMessage) {
   showToast("Copy text is visible in the share card.");
 }
 
+function launchFromActionTarget(target) {
+  const launchAddress = target?.dataset?.launchAddress;
+  if (launchAddress) {
+    const testnetLaunch = (state.testnetData.launches || []).find((item) => addressMatches(item.address, launchAddress));
+    if (testnetLaunch) {
+      state.selectedId = `testnet-${testnetLaunch.index}`;
+      return currentLaunch();
+    }
+  }
+
+  if (state.view === "testnet") {
+    const testnetLaunch = selectedTestnetLaunch();
+    if (testnetLaunch) {
+      state.selectedId = `testnet-${testnetLaunch.index}`;
+      return currentLaunch();
+    }
+  }
+
+  return currentLaunch();
+}
+
+function openLaunchpadForLaunch(launch, message = "Launch opened.") {
+  if (!launch) {
+    showToast("Select a launch first.");
+    return;
+  }
+
+  state.view = "launchpad";
+  state.tab = launchStatusTabFor(launch);
+  state.selectedId = launch.id;
+  state.wizardOpen = false;
+  renderApp();
+  window.setTimeout(() => {
+    document.querySelector(".detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 0);
+  showToast(message);
+}
+
+function openProofForLaunch(launch, message = "Verification opened.") {
+  if (!launch) {
+    showToast("Select a launch first.");
+    return;
+  }
+
+  state.view = "proof";
+  state.selectedId = launch.id;
+  state.wizardOpen = false;
+  renderApp();
+  window.setTimeout(() => {
+    document.querySelector(".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 0);
+  showToast(message);
+}
+
 async function handleClick(event) {
   const target = event.target.closest("button, .drawer-backdrop");
   if (!target) return;
@@ -6383,6 +6771,44 @@ async function handleClick(event) {
       showToast(`${launch.statusLabel} launch opened on the Launchpad.`);
       break;
     }
+    case "view-current-launch": {
+      const launch = launchFromActionTarget(target);
+      openLaunchpadForLaunch(launch, "Launch opened.");
+      break;
+    }
+    case "view-current-proof": {
+      const launch = launchFromActionTarget(target);
+      openProofForLaunch(launch, "Verification opened.");
+      break;
+    }
+    case "focus-contribution": {
+      const launch = launchFromActionTarget(target);
+      if (!launch) {
+        showToast("Select a live launch first.");
+        break;
+      }
+
+      state.view = "launchpad";
+      state.tab = launchStatusTabFor(launch);
+      state.selectedId = launch.id;
+      state.wizardOpen = false;
+      renderApp();
+      window.setTimeout(() => {
+        document.querySelector(".side-stack")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+      showToast("Contribution panel opened.");
+      break;
+    }
+    case "copy-link": {
+      const launch = launchFromActionTarget(target);
+      if (!launch) {
+        showToast("Select a launch first.");
+        break;
+      }
+
+      copyText(launchShareUrl(launch), "Verification link copied.");
+      break;
+    }
     case "approve-sale-token":
       await runTestnetLaunchAction("approveSaleToken");
       break;
@@ -6479,7 +6905,7 @@ async function handleClick(event) {
       renderApp();
       break;
     case "show-toast":
-      showToast("Prototype action captured. This would open the linked detail flow.");
+      showToast(target.dataset.toast || "Prototype action captured. This would open the linked detail flow.");
       break;
     case "open-testnet-finalization":
       openTestnetFinalizationControls();

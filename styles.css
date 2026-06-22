@@ -421,6 +421,64 @@ h3 {
   padding: 0;
 }
 
+.next-step-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(54, 230, 182, 0.32);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  background:
+    linear-gradient(135deg, rgba(54, 230, 182, 0.12), rgba(242, 200, 75, 0.05)),
+    rgba(14, 31, 32, 0.88);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.18);
+}
+
+.next-step-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.next-step-kicker {
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.next-step-card h3 {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.next-step-card p {
+  max-width: 840px;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.next-step-note {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.next-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.next-step-actions .button {
+  min-height: 42px;
+}
+
 .tabs {
   display: flex;
   align-items: center;
@@ -2071,6 +2129,16 @@ h3 {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .next-step-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .next-step-actions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
   .side-stack {
     position: static;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2328,7 +2396,8 @@ h3 {
   .drawer-actions .button,
   .social-actions .button,
   .share-actions .button,
-  .header-actions .button {
+  .header-actions .button,
+  .next-step-actions .button {
     flex: 1 1 100%;
   }
 
