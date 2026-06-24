@@ -486,6 +486,8 @@ const state = {
   proofIndexLastUpdated: "",
   proofIndexBlock: null,
   proofRecords: {},
+  pairRecoveryInFlight: {},
+  pairRecoveryErrors: {},
   contribution: "",
   wizardOpen: false,
   wizardStep: 0,
@@ -1729,6 +1731,96 @@ async function readTopazPair(token, quoteToken) {
   return decodeAddress(await ethCall(bnbTestnet.contracts.mockTopazFactory, data));
 }
 
+const zeroEvmAddress = "0x0000000000000000000000000000000000000000";
+
+function isUsableEvmAddress(address) {
+  return isEvmAddress(address) && normalizeAddress(address) !== zeroEvmAddress;
+}
+
+function firstUsableEvmAddress(...addresses) {
+  return addresses.find((address) => isUsableEvmAddress(address)) || "";
+}
+
+function launchSaleVaultAddress(launch) {
+  return launch?.testnet?.vault || launch?.address || "";
+}
+
+function launchQuoteToken(launch) {
+  return launch?.config?.quoteToken || bnbTestnet.contracts.mockUsdt;
+}
+
+function launchTopazPair(launch, proof = null) {
+  return firstUsableEvmAddress(proof?.pair, launch?.testnet?.pair, launch?.testnet?.proofTrail?.pair, launch?.pair);
+}
+
+function rememberRecoveredTopazPair(launch, pair) {
+  const usablePair = firstUsableEvmAddress(pair);
+  const saleVault = launchSaleVaultAddress(launch);
+  if (!usablePair || !isUsableEvmAddress(saleVault)) return "";
+
+  launch.testnet = { ...(launch.testnet || {}), pair: usablePair };
+  launch.testnet.proofTrail = { ...(launch.testnet.proofTrail || {}), pair: usablePair };
+
+  const key = normalizeAddress(saleVault);
+  const previousRecord = state.proofRecords[key] || {};
+  state.proofRecords[key] = {
+    ...previousRecord,
+    saleVault,
+    pair: usablePair,
+    available: true,
+    recovered: true,
+    source: previousRecord.source || "Topaz factory pair recovery",
+  };
+  delete state.pairRecoveryErrors[key];
+  return usablePair;
+}
+
+function launchPairRecoveryKey(launch) {
+  const saleVault = launchSaleVaultAddress(launch);
+  return isUsableEvmAddress(saleVault) ? normalizeAddress(saleVault) : "";
+}
+
+function launchPairCanBeRecovered(launch) {
+  return Boolean(
+    launch?.testnet &&
+      launch.status === "finalized" &&
+      isUsableEvmAddress(launch?.config?.saleToken) &&
+      isUsableEvmAddress(launchQuoteToken(launch)),
+  );
+}
+
+async function recoverTopazPairForLaunch(launch) {
+  if (!launchPairCanBeRecovered(launch)) return "";
+  const pair = await readTopazPair(launch.config.saleToken, launchQuoteToken(launch));
+  return rememberRecoveredTopazPair(launch, pair);
+}
+
+function scheduleTopazPairRecovery(launch) {
+  const key = launchPairRecoveryKey(launch);
+  if (!key || state.pairRecoveryInFlight[key] || !launchPairCanBeRecovered(launch)) return;
+
+  state.pairRecoveryInFlight[key] = true;
+  recoverTopazPairForLaunch(launch)
+    .catch((error) => {
+      state.pairRecoveryErrors[key] = error?.message || "Could not read the Topaz pair from BNB testnet yet.";
+    })
+    .finally(() => {
+      delete state.pairRecoveryInFlight[key];
+      renderApp();
+    });
+}
+
+function missingTopazPairMessage(launch) {
+  const key = launchPairRecoveryKey(launch);
+  if (key && state.pairRecoveryInFlight[key]) return "Reading the Topaz pair from BNB testnet. Try again in a moment.";
+  if (key && state.pairRecoveryErrors[key]) return `Could not read the Topaz pair yet: ${state.pairRecoveryErrors[key]}`;
+  return "This finalized launch does not have a saved Topaz pair yet. The app is checking the Topaz factory now.";
+}
+
+function launchHasPairOrRecoverablePair(launch, proof = testnetProofFor(launch)) {
+  return isUsableEvmAddress(launchTopazPair(launch, proof)) || launchPairCanBeRecovered(launch);
+}
+
 function buildRegisterLpLockData(pair, creator) {
   return `${contractSelectors.feeLockerRegisterLock}${[
     encodeAbiAddress(pair),
@@ -2057,14 +2149,14 @@ async function claimRefundFromSaleVault() {
 function lpFeeClaimEligibleLaunches() {
   return launchpadLaunches().filter((launch) => {
     const proof = testnetProofFor(launch);
-    return launch.testnet && launch.status === "finalized" && isEvmAddress(proof?.pair);
+    return launch.testnet && launch.status === "finalized" && launchHasPairOrRecoverablePair(launch, proof);
   });
 }
 
 function lpFeeClaimTargetLaunch() {
   const selected = currentLaunch();
   const selectedProof = testnetProofFor(selected);
-  if (selected?.testnet && selected.status === "finalized" && isEvmAddress(selectedProof?.pair)) return selected;
+  if (selected?.testnet && selected.status === "finalized" && launchHasPairOrRecoverablePair(selected, selectedProof)) return selected;
   return lpFeeClaimEligibleLaunches()[0] || selected;
 }
 
@@ -2077,25 +2169,27 @@ function lpLockRegisteredForLaunch(launch, proof = testnetProofFor(launch)) {
 
   const registeredPair = state.lpLockRegistrationTx.pair;
   const registeredVault = state.lpLockRegistrationTx.saleVault;
-  const saleVault = launch?.testnet?.vault || launch?.address || "";
+  const saleVault = launchSaleVaultAddress(launch);
+  const pair = launchTopazPair(launch, proof);
 
   return Boolean(
     state.lpLockRegistrationTx.hash &&
-      isEvmAddress(registeredPair) &&
-      isEvmAddress(proof?.pair) &&
-      addressMatches(registeredPair, proof.pair) &&
-      (!isEvmAddress(registeredVault) || addressMatches(registeredVault, saleVault)),
+      isUsableEvmAddress(registeredPair) &&
+      isUsableEvmAddress(pair) &&
+      addressMatches(registeredPair, pair) &&
+      (!isUsableEvmAddress(registeredVault) || addressMatches(registeredVault, saleVault)),
   );
 }
 
 function lpFeeClaimedForLaunch(launch, proof = testnetProofFor(launch)) {
   if (proof?.lpFeeClaimTx) return true;
+  const pair = launchTopazPair(launch, proof);
 
   return Boolean(
     state.lpFeeClaimTx.hash &&
-      isEvmAddress(state.lpFeeClaimTx.pair) &&
-      isEvmAddress(proof?.pair) &&
-      addressMatches(state.lpFeeClaimTx.pair, proof.pair),
+      isUsableEvmAddress(state.lpFeeClaimTx.pair) &&
+      isUsableEvmAddress(pair) &&
+      addressMatches(state.lpFeeClaimTx.pair, pair),
   );
 }
 
@@ -2129,7 +2223,11 @@ function lpLockRegistrationValidation(launch = lpFeeClaimTargetLaunch()) {
 
   const proof = testnetProofFor(launch);
   const creator = launchCreatorAddress(launch);
-  if (!isEvmAddress(proof?.pair)) return { ok: false, message: "This finalized launch does not have a saved Topaz pair yet." };
+  const pair = launchTopazPair(launch, proof);
+  if (!isUsableEvmAddress(pair)) {
+    scheduleTopazPairRecovery(launch);
+    return { ok: false, message: missingTopazPairMessage(launch) };
+  }
   if (!isEvmAddress(creator)) return { ok: false, message: "This launch does not have a valid creator receiver address." };
   if (lpLockRegisteredForLaunch(launch, proof)) return { ok: false, message: "LP lock is registered. Claim and split LP fees next." };
 
@@ -2142,7 +2240,11 @@ function lpFeeClaimValidation(launch = lpFeeClaimTargetLaunch()) {
   if (launch.status !== "finalized") return { ok: false, message: "LP fees can be claimed after a successful finalization." };
 
   const proof = testnetProofFor(launch);
-  if (!isEvmAddress(proof?.pair)) return { ok: false, message: "This finalized launch does not have a saved Topaz pair yet." };
+  const pair = launchTopazPair(launch, proof);
+  if (!isUsableEvmAddress(pair)) {
+    scheduleTopazPairRecovery(launch);
+    return { ok: false, message: missingTopazPairMessage(launch) };
+  }
   if (!lpLockRegisteredForLaunch(launch, proof)) {
     return { ok: false, message: "Register the LP lock first, then claim and split LP fees." };
   }
@@ -2167,9 +2269,9 @@ async function registerLpLockForLaunch() {
   }
 
   const proof = testnetProofFor(launch);
-  const pair = proof.pair;
+  const pair = launchTopazPair(launch, proof);
   const creator = launchCreatorAddress(launch);
-  const saleVault = launch?.testnet?.vault || launch?.address || "";
+  const saleVault = launchSaleVaultAddress(launch);
 
   try {
     state.lpLockRegistrationTx = {
@@ -2224,7 +2326,8 @@ async function claimLpFeesFromLocker() {
     return;
   }
 
-  const pair = testnetProofFor(launch).pair;
+  const proof = testnetProofFor(launch);
+  const pair = launchTopazPair(launch, proof);
 
   try {
     state.lpFeeClaimTx = { status: "Claim LP fees: waiting for admin wallet approval...", hash: "", pair, error: "" };
@@ -3449,7 +3552,7 @@ function verificationRowsFor(launch) {
       ["Platform success fee", money(plan.successFee), `${platformEconomics.successFeeLabel} of final raise`, "Accounted"],
       ["Net raise after fee", money(plan.netRaise), "Post-fee accounting base", "Ready"],
       ["Topaz liquidity", money(plan.quoteToLp), `${plan.liquidityPercent}% committed to LP`, "Added"],
-      ["Topaz pair", proof ? renderAddressLink(proof.pair) : plan.pair, launch.proof.poolType, "Trade ready"],
+      ["Topaz pair", renderAddressLink(launchTopazPair(launch, proof)) || plan.pair, launch.proof.poolType, "Trade ready"],
       ["LP token lock", proof ? renderAddressLink(proof.lpReceiver) : launch.proof.lockTx, launch.proof.lockDuration, "Locked"],
       ["Buyer claims", "Open", "Claims follow vesting schedule", "Open"],
       ["Trade on Topaz", "Direct link available", "Use pair route if indexer lags", "Ready"],
@@ -4837,10 +4940,11 @@ function renderProofStatus(label, tone = "ready") {
 
 function topazTradeDestination(launch) {
   const proof = testnetProofFor(launch);
-  if (launch?.testnet && isEvmAddress(proof?.pair)) {
+  const pair = launchTopazPair(launch, proof);
+  if (launch?.testnet && isUsableEvmAddress(pair)) {
     return {
       label: "View Testnet Pair",
-      url: explorerAddressUrl(proof.pair),
+      url: explorerAddressUrl(pair),
       message: "Opened the BNB testnet mock Topaz pair proof.",
     };
   }
@@ -4874,7 +4978,9 @@ function testnetProofFor(launch) {
   const indexedRecord = state.proofRecords[normalizeAddress(vault)] || null;
   const fallback = testnetProofRegistry[normalizeAddress(vault)] || null;
   const indexed = launch?.testnet?.proofTrail || launch?.proofTrail || null;
-  return mergeProofSources(fallback, indexedRecord, indexed);
+  const merged = mergeProofSources(fallback, indexedRecord, indexed);
+  const pair = launchTopazPair(launch, merged);
+  return isUsableEvmAddress(pair) ? { ...merged, pair } : merged;
 }
 
 function hasProofValue(value) {
@@ -4952,7 +5058,7 @@ function renderFinalizedProofTrail(launch) {
     ],
     [
       "3. Topaz LP created",
-      renderAddressLink(proof.pair),
+      renderAddressLink(launchTopazPair(launch, proof)),
       `${proofQuantity(proof.quoteToLiquidity, proof.quoteSymbol)} + ${proofQuantity(proof.tokenPaired, launch.symbol)} paired`,
       renderProofStatus("Pair ready"),
     ],
